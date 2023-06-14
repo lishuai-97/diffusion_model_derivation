@@ -41,14 +41,14 @@ $$
 
 $$
 \begin{aligned}
-x_{t} & = \sqrt{1-\beta_{t}}x_{t-1} + \beta_{t}\epsilon_{t-1} \quad \text{ where } \epsilon_{t-1}, \epsilon_{t-2}, \ldots \sim \mathcal{N}\left(0, \mathbf{I}\right)\\
-& =\sqrt{\alpha_{t}}x_{t-1} + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
-& =\sqrt{\alpha_{t}}\left(\sqrt{\alpha_{t-1}}x_{t-2} + \sqrt{1-\alpha_{t-1}}\epsilon_{t-2}\right) + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
-& =\sqrt{\alpha_{t}\alpha_{t-1}}x_{t-2} + \left(\sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)}\epsilon_{t-2} + \sqrt{1-\alpha_{t}}\epsilon_{t-1}\right) \\
-& =\sqrt{\alpha_{t} \alpha_{t-1}}x_{t-2} + \sqrt{1-\alpha_{t}\alpha_{t-1}}\bar{\epsilon}_{t-2} \quad \text {where } \bar{\epsilon}_{t-2} \sim \mathcal{N}(0, \mathbf{I})  \text{ mergs two Gaussion $\left( \* \right)$}\\
-& =\ldots \\
-& =\sqrt{\bar{\alpha}_{t}}x_{0} + \sqrt{1-\bar{\alpha}_{t}}\epsilon. \\
-q\left(x_{t} \mid x_{0}\right) & = \mathcal{N}\left(x_{t}; \sqrt{\bar{\alpha_{t}}}x_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right).
+    x_{t} & = \sqrt{1-\beta_{t}}x_{t-1} + \beta_{t}\epsilon_{t-1} \quad \text{ where } \epsilon_{t-1}, \epsilon_{t-2}, \ldots \sim \mathcal{N}\left(0, \mathbf{I}\right)\\
+    & =\sqrt{\alpha_{t}}x_{t-1} + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
+    & =\sqrt{\alpha_{t}}\left(\sqrt{\alpha_{t-1}}x_{t-2} + \sqrt{1-\alpha_{t-1}}\epsilon_{t-2}\right) + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
+    & =\sqrt{\alpha_{t}\alpha_{t-1}}x_{t-2} + \left(\sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)}\epsilon_{t-2} + \sqrt{1-\alpha_{t}}\epsilon_{t-1}\right) \\
+    & =\sqrt{\alpha_{t} \alpha_{t-1}}x_{t-2} + \sqrt{1-\alpha_{t}\alpha_{t-1}}\bar{\epsilon}_{t-2} \quad \text {where } \bar{\epsilon}_{t-2} \sim \mathcal{N}(0, \mathbf{I})  \text{ mergs two Gaussion $\left( \* \right)$}\\
+    & =\ldots \\
+    & =\sqrt{\bar{\alpha}_{t}}x_{0} + \sqrt{1-\bar{\alpha}_{t}}\epsilon. \\
+    q\left(x_{t} \mid x_{0}\right) & = \mathcal{N}\left(x_{t}; \sqrt{\bar{\alpha_{t}}}x_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right).
 \end{aligned}
 $$
 
