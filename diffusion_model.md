@@ -31,7 +31,7 @@ $$
 重参数技巧在很多工作(Gumbel Softmax, VAE)中有所引用。如果我们要从某个分布中随机采样(高斯分布)一个样本，这个过程是无法反传梯度的。而这个通过高斯噪声采样得到的$x_{t}$的过程在diffusion中到处都是，因此我们需要通过重参数技巧来使得它可微。最通常的做法是把随机性通过一个独立的随机变量($\epsilon$)引导过去。举个例子，如果要从高斯分布$z \sim \mathcal{N}\left(z; \mu_{\theta}, \sigma_{\theta}^{2}\mathbf{I}\right)$采样一个$z$，我们可以写成：
 
 $$
-z = \mu_{\theta} + \sigma_{\theta} \odot \epsilon, \quad \epsilon \sim \mathcal{N}\left(0, \mathbf{I}\right)
+    z = \mu_{\theta} + \sigma_{\theta} \odot \epsilon, \quad \epsilon \sim \mathcal{N}\left(0, \mathbf{I}\right)
 $$
 
 上式的$z$依旧是有随机性的，且满足均值为$\mu_{\theta}$方差为$\sigma_{\theta}^{2}$的高斯分布。这里的$\mu_{\theta}$，$\sigma_{\theta}^{2}$可以是由参数$\theta$的神经网络推断得到的。整个“采样”过程依旧梯度可导，随机性被转嫁到了$\epsilon$上。
@@ -41,14 +41,14 @@ $$
 
 $$
 \begin{aligned}
-    x_{t} & = \sqrt{1-\beta_{t}}x_{t-1} + \beta_{t}\epsilon_{t-1} \quad \text{ where } \epsilon_{t-1}, \epsilon_{t-2}, \ldots \sim \mathcal{N}\left(0, \mathbf{I}\right)\\
-    & =\sqrt{\alpha_{t}}x_{t-1} + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
-    & =\sqrt{\alpha_{t}}\left(\sqrt{\alpha_{t-1}}x_{t-2} + \sqrt{1-\alpha_{t-1}}\epsilon_{t-2}\right) + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
-    & =\sqrt{\alpha_{t}\alpha_{t-1}}x_{t-2} + \left(\sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)}\epsilon_{t-2} + \sqrt{1-\alpha_{t}}\epsilon_{t-1}\right) \\
-    & =\sqrt{\alpha_{t} \alpha_{t-1}}x_{t-2} + \sqrt{1-\alpha_{t}\alpha_{t-1}}\bar{\epsilon}_{t-2} \quad \text {where } \bar{\epsilon}_{t-2} \sim \mathcal{N}(0, \mathbf{I})  \text{ mergs two Gaussion $\left( \* \right)$}\\
-    & =\ldots \\
-    & =\sqrt{\bar{\alpha}_{t}}x_{0} + \sqrt{1-\bar{\alpha}_{t}}\epsilon. \\
-    q\left(x_{t} \mid x_{0}\right) & = \mathcal{N}\left(x_{t}; \sqrt{\bar{\alpha_{t}}}x_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right).
+    x_{t} & = \sqrt{1-\beta_{t}} x_{t-1} + \beta_{t}\epsilon_{t-1} \quad \text{ where } \epsilon_{t-1}, \epsilon_{t-2}, \ldots \sim \mathcal{N}\left(0, \mathbf{I}\right)\\
+    & = \sqrt{\alpha_{t}} x_{t-1} + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
+    & = \sqrt{\alpha_{t}} \left(\sqrt{\alpha_{t-1}} x_{t-2} + \sqrt{1-\alpha_{t-1}}\epsilon_{t-2}\right) + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
+    & = \sqrt{\alpha_{t} \alpha_{t-1}}x_{t-2} + \left(\sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)} \epsilon_{t-2} + \sqrt{1-\alpha_{t}}\epsilon_{t-1}\right) \\
+    & = \sqrt{\alpha_{t} \alpha_{t-1}}x_{t-2} + \sqrt{1-\alpha_{t}\alpha_{t-1}}\bar{\epsilon}_{t-2} \quad \text { where } \bar{\epsilon}_{t-2} \sim \mathcal{N}\left(0, \mathbf{I}\right)  \text{ mergs two Gaussion $\left( \* \right)$}\\
+    & = \ldots \\
+    & = \sqrt{\bar{\alpha}_{t}} x_{0} + \sqrt{1-\bar{\alpha}_{t}} \epsilon. \\
+    q\left(x_{t} \mid x_{0}\right) & = \mathcal{N}\left(x_{t}; \sqrt{\bar{\alpha_{t}}} x_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right).
 \end{aligned}
 $$
 
