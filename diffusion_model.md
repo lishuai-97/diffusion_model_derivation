@@ -71,19 +71,19 @@ $$
 
 ### Diffusion逆向(推断)过程
 
-如果说前向过程(forward)是加噪的过程，那么逆向过程(reverse)就是diffusion的去噪推断过程。如果我们能够逐步得到逆转后的分布$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right)$，就可以从标准的高斯分布$\mathbf{x}_{T} \sim \mathbf{N}\left(0, \mathbf{I}\right)$还原出原图$\mathbf{x}_{0}$。在文献[1]中证明了如果$q\left(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}\right)$满足高斯分布且$\beta_{t}$足够小，$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right)$仍然是一个高斯分布。然而我们无法简单推断$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right)$，因此我们使用深度学习模型(参数为$\theta$，目前主流是U-Net+Attention的结构)去预测这样一个逆向分布$p_{\theta}$(类似VAE)：
+如果说前向过程(forward)是加噪的过程，那么逆向过程(reverse)就是diffusion的去噪推断过程。如果我们能够逐步得到逆转后的分布$q\left(x_{t-1} \mid x_{t}\right)$，就可以从标准的高斯分布$x_{T} \sim \mathbf{N}\left(0, \mathbf{I}\right)$还原出原图$x_{0}$。在文献[1]中证明了如果$q\left(x_{t} \mid x_{t-1}\right)$满足高斯分布且$\beta_{t}$足够小，$q\left(x_{t-1} \mid x_{t}\right)$仍然是一个高斯分布。然而我们无法简单推断$q\left(x_{t-1} \mid x_{t}\right)$，因此我们使用深度学习模型(参数为$\theta$，目前主流是U-Net+Attention的结构)去预测这样一个逆向分布$p_{\theta}$(类似VAE)：
 
 $$
 \begin{aligned}
-    p_{\theta}\left(\mathbin{X}_{0:T}\right) & = p\left(\mathbf{x}_{T}\right)\prod_{t=1}^{T}p_{\theta}\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right);  \\
-    p_{\theta}\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right) & = \mathcal{N}\left(\mathbf{x}_{t-1}; \boldsymbol{\mu}_{\theta}\left(\mathbf{x}_{t}, t\right), \boldsymbol{\Sigma}_{\theta}\left(\mathbf{x}_{t}, t\right)\right).
+    p_{\theta}\left(X_{0:T}\right) & = p\left(x_{T}\right)\prod_{t=1}^{T}p_{\theta}\left(x_{t-1} \mid x_{t}\right);  \\
+    p_{\theta}\left(x_{t-1} \mid x_{t}\right) & = \mathcal{N}\left(x_{t-1}; \boldsymbol{\mu}_{\theta}\left(x_{t}, t\right), \boldsymbol{\Sigma}_{\theta}\left(x_{t}, t\right)\right).
 \end{aligned}
 $$
 
-虽然我们无法得到逆转后的分布$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right)$，但是如果知道$\mathbf{x}_{0}$，我们是可以通过贝叶斯公式得到$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right)$为：
+虽然我们无法得到逆转后的分布$q\left(x_{t-1} \mid x_{t}\right)$，但是如果知道$x_{0}$，我们是可以通过贝叶斯公式得到$q\left(x_{t-1} \mid x_{t}, x_{0}\right)$为：
 
 $$
-q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right) = \mathcal{N}\left(\mathbf{x}_{t-1}; \tilde{\mu}\left(\mathbf{x}_{t}, \mathbf{x}_{0}\right), \tilde{\beta_{t}}\mathbf{I}\right)
+q\left(x_{t-1} \mid x_{t}, x_{0}\right) = \mathcal{N}\left(x_{t-1}; \tilde{\mu}\left(x_{t}, x_{0}\right), \tilde{\beta_{t}}\mathbf{I}\right)
 $$
 
 过程如下：
