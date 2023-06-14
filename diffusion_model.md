@@ -36,19 +36,19 @@ $$
 
 上式的$z$依旧是有随机性的，且满足均值为$\mu_{\theta}$方差为$\sigma_{\theta}^{2}$的高斯分布。这里的$\mu_{\theta}$，$\sigma_{\theta}^{2}$可以是由参数$\theta$的神经网络推断得到的。整个“采样”过程依旧梯度可导，随机性被转嫁到了$\epsilon$上。
 
-#### 特性2：任意时刻的$\mathbf{x}_{t}$可以由$\mathbf{x}_{0}$和$\beta$表示
-能够通过$\mathbf{x}_{0}$和$\beta$快速得到$\mathbf{x}_{t}$，对后续diffusion model的推断和推导有巨大作用。首先我们假设$\alpha_{t} = 1 - \beta_{t}$，并且$\bar{\alpha_{t}}=\prod_{i=1}^{T}\alpha_{i}$，由式$(1)$展开$\mathbf{x}_{t}$可以得到：
+#### 特性2：任意时刻的$x_{t}$可以由$x_{0}$和$\beta$表示
+能够通过$x_{0}$和$\beta$快速得到$x_{t}$，对后续diffusion model的推断和推导有巨大作用。首先我们假设$\alpha_{t} = 1 - \beta_{t}$，并且$\bar{\alpha_{t}}=\prod_{i=1}^{T}\alpha_{i}$，由式$(1)$展开$x_{t}$可以得到：
 
 $$
 \begin{aligned}
-\mathbf{x}_{t} & = \sqrt{1-\beta_{t}}\mathbf{x}_{t-1} + \beta_{t}\epsilon_{t-1} \quad \text{ where } \epsilon_{t-1}, \epsilon_{t-2}, \ldots \sim \mathcal{N}(0, \mathbf{I})\\
-& =\sqrt{\alpha_{t}}\mathbf{x}_{t-1} + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
-& =\sqrt{\alpha_{t}}\left(\sqrt{\alpha_{t-1}}\mathbf{x}_{t-2} + \sqrt{1-\alpha_{t-1}}\epsilon_{t-2}\right) + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
-& =\sqrt{\alpha_{t}\alpha_{t-1}}\mathbf{x}_{t-2} + \left(\sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)}\epsilon_{t-2} + \sqrt{1-\alpha_{t}}\epsilon_{t-1}\right) \\
-& =\sqrt{\alpha_{t} \alpha_{t-1}}\mathbf{x}_{t-2} + \sqrt{1-\alpha_{t}\alpha_{t-1}}\bar{\epsilon}_{t-2} \quad \text {where } \bar{\epsilon}_{t-2} \sim \mathcal{N}(0, \mathbf{I})  \text{ mergs two Gaussion$\left(*\right)$}\\
+x_{t} & = \sqrt{1-\beta_{t}}x_{t-1} + \beta_{t}\epsilon_{t-1} \quad \text{ where } \epsilon_{t-1}, \epsilon_{t-2}, \ldots \sim \mathcal{N}(0, \mathbf{I})\\
+& =\sqrt{\alpha_{t}}x_{t-1} + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
+& =\sqrt{\alpha_{t}}\left(\sqrt{\alpha_{t-1}}x_{t-2} + \sqrt{1-\alpha_{t-1}}\epsilon_{t-2}\right) + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
+& =\sqrt{\alpha_{t}\alpha_{t-1}}x_{t-2} + \left(\sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)}\epsilon_{t-2} + \sqrt{1-\alpha_{t}}\epsilon_{t-1}\right) \\
+& =\sqrt{\alpha_{t} \alpha_{t-1}}x_{t-2} + \sqrt{1-\alpha_{t}\alpha_{t-1}}\bar{\epsilon}_{t-2} \quad \text {where } \bar{\epsilon}_{t-2} \sim \mathcal{N}(0, \mathbf{I})  \text{ mergs two Gaussion$\left(*\right)$}\\
 & =\ldots \\
-& =\sqrt{\bar{\alpha}_{t}}\mathbf{x}_{0} + \sqrt{1-\bar{\alpha}_{t}}\epsilon. \\
-q\left(\mathbf{x}_{t} \mid \mathbf{x}_{0}\right) & = \mathcal{N}\left(\mathbf{x}_{t}; \sqrt{\bar{\alpha_{t}}}\mathbf{x}_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right).
+& =\sqrt{\bar{\alpha}_{t}}x_{0} + \sqrt{1-\bar{\alpha}_{t}}\epsilon. \\
+q\left(x_{t} \mid x_{0}\right) & = \mathcal{N}\left(x_{t}; \sqrt{\bar{\alpha_{t}}}x_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right).
 \tag{2}
 \end{aligned}
 $$
@@ -64,9 +64,9 @@ $$
 \end{aligned}
 $$
 
-因此可以混合两个高斯分布得到标准差为$\sqrt{1-\alpha_{t}\alpha_{t-1}}$的混合高斯分布，式$(2)$中的$\bar{\epsilon_{t-2}}$仍然是标准高斯分布。而任意时刻的$\mathbf{x}_{t}$满足$q\left(\mathbf{x}_{t} \mid \mathbf{x}_{0}\right) = \mathcal{N}\left(\mathbf{x}_{t}; \sqrt{\bar{\alpha_{t}}}\mathbf{x}_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right)$.
+因此可以混合两个高斯分布得到标准差为$\sqrt{1-\alpha_{t}\alpha_{t-1}}$的混合高斯分布，式$(2)$中的$\bar{\epsilon_{t-2}}$仍然是标准高斯分布。而任意时刻的$x_{t}$满足$q\left(x_{t} \mid x_{0}\right) = \mathcal{N}\left(x_{t}; \sqrt{\bar{\alpha_{t}}}x_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right)$.
 
-通过$Eq(2)$、$(3)$，可以发现当$\mathbin{T} \rightarrow \infin, \mathbf{x}_{T} \sim \mathcal{N}\left(0, \mathbf{I}\right)$，所以$\sqrt{1-\beta_{t}}$的均值系数能够稳定保证$\mathbf{x}_{T}$最后收敛到方差为1的保准高斯分布，且在$Eq(3)$的推导中也更为简洁优雅。
+通过$Eq(2)$、$(3)$，可以发现当$\mathbin{T} \rightarrow \infin, x_{T} \sim \mathcal{N}\left(0, \mathbf{I}\right)$，所以$\sqrt{1-\beta_{t}}$的均值系数能够稳定保证$x_{T}$最后收敛到方差为1的保准高斯分布，且在$Eq(3)$的推导中也更为简洁优雅。
 
 ---
 
