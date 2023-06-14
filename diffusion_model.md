@@ -28,7 +28,7 @@ $$
 前向过程结束介绍前，需要讲述一下diffusion在实现和推导过程中要用到的两个重要特征。
 
 #### 特性1：重参数(reparameterization trick)
-重参数技巧在很多工作(Gumbel Softmax, VAE)中有所引用。如果我们要从某个分布中随机采样(高斯分布)一个样本，这个过程是无法反传梯度的。而这个通过高斯噪声采样得到的$\mathbf{x}_{t}$的过程在diffusion中到处都是，因此我们需要通过重参数技巧来使得它可微。最通常的做法是把随机性通过一个独立的随机变量($\epsilon$)引导过去。举个例子，如果要从高斯分布$z \sim \mathcal{N}\left(z; \mu_{\theta}, \sigma_{\theta}^{2}\mathbf{I}\right)$采样一个$z$，我们可以写成：
+重参数技巧在很多工作(Gumbel Softmax, VAE)中有所引用。如果我们要从某个分布中随机采样(高斯分布)一个样本，这个过程是无法反传梯度的。而这个通过高斯噪声采样得到的$x_{t}$的过程在diffusion中到处都是，因此我们需要通过重参数技巧来使得它可微。最通常的做法是把随机性通过一个独立的随机变量($\epsilon$)引导过去。举个例子，如果要从高斯分布$z \sim \mathcal{N}\left(z; \mu_{\theta}, \sigma_{\theta}^{2}\mathbf{I}\right)$采样一个$z$，我们可以写成：
 
 $$
 z = \mu_{\theta} + \sigma_{\theta} \odot \epsilon, \quad \epsilon \sim \mathcal{N}\left(0, \mathbf{I}\right)
