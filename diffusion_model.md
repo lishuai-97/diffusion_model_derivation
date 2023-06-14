@@ -65,7 +65,7 @@ $$
 
 因此可以混合两个高斯分布得到标准差为$\sqrt{1-\alpha_{t}\alpha_{t-1}}$的混合高斯分布，式$(2)$中的$\bar{\epsilon_{t-2}}$仍然是标准高斯分布。而任意时刻的$x_{t}$满足$q\left(x_{t} \mid x_{0}\right) = \mathcal{N}\left(x_{t}; \sqrt{\bar{\alpha_{t}}}x_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right)$.
 
-通过$Eq(2)$、$(3)$，可以发现当$\mathbin{T} \rightarrow \infin, x_{T} \sim \mathcal{N}\left(0, \mathbf{I}\right)$，所以$\sqrt{1-\beta_{t}}$的均值系数能够稳定保证$x_{T}$最后收敛到方差为1的保准高斯分布，且在$Eq(3)$的推导中也更为简洁优雅。
+通过$Eq(2)$、$(3)$，可以发现当$\mathbin{T} \rightarrow \infty, x_{T} \sim \mathcal{N}\left(0, \mathbf{I}\right)$，所以$\sqrt{1-\beta_{t}}$的均值系数能够稳定保证$x_{T}$最后收敛到方差为1的保准高斯分布，且在$Eq(3)$的推导中也更为简洁优雅。
 
 ---
 
