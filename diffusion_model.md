@@ -1,5 +1,5 @@
 # Diffusion Model
-Diffusion Model和其他生成模型最大的区别是它的latent code(z)和原图是同尺寸大小的，当然最近也有基于压缩的latent diffusion model。一句话概括diffusion model，即存在一系列高斯噪声($T$轮)，将输入图片$\mathcal{x}_{0}$变为纯高斯噪声$\mathcal{x}_{T}$。而我们的模型则负责将$\mathcal{x}_{T}$复原回图片$\mathcal{x}_{0}$。这样一来其实diffusion model和GAN很像，都是给定噪声$\mathcal{x}_{T}$生成图片$\mathcal{x}_{0}$，但是要强调的是，这里的$\mathcal{x}_{T}$与图片$\mathcal{x}_{0}$是**同维度**的。
+Diffusion Model和其他生成模型最大的区别是它的latent code(z)和原图是同尺寸大小的，当然最近也有基于压缩的latent diffusion model。一句话概括diffusion model，即存在一系列高斯噪声($T$轮)，将输入图片$x_{0}$变为纯高斯噪声$x_{T}$。而我们的模型则负责将$x_{T}$复原回图片$x_{0}$。这样一来其实diffusion model和GAN很像，都是给定噪声$x_{T}$生成图片$x_{0}$，但是要强调的是，这里的$x_{T}$与图片$x_{0}$是**同维度**的。
 
 <div style="text-align:center">
 <img src="./figs/generative_model.png">
