@@ -1,5 +1,5 @@
 # Diffusion Model
-Diffusion Model和其他生成模型最大的区别是它的latent code(z)和原图是同尺寸大小的，当然最近也有基于压缩的latent diffusion model。一句话概括diffusion model，即存在一系列高斯噪声($T$轮)，将输入图片$x_{0}$变为纯高斯噪声$x_{T}$。而我们的模型则负责将$x_{T}$复原回图片$x_{0}$。这样一来其实diffusion model和GAN很像，都是给定噪声$x_{T}$生成图片$x_{0}$，但是要强调的是，这里的$x_{T}$与图片$x_{0}$是**同维度**的。
+Diffusion Model和其他生成模型最大的区别是它的latent code(z)和原图是同尺寸大小的，当然最近也有基于压缩的latent diffusion model。一句话概括diffusion model，即存在一系列高斯噪声(TT轮)，将输入图片x_{0}x_{0}变为纯高斯噪声x_{T}x_{T}。而我们的模型则负责将x_{T}x_{T}复原回图片x_{0}x_{0}。这样一来其实diffusion model和GAN很像，都是给定噪声x_{T}x_{T}生成图片x_{0}x_{0}，但是要强调的是，这里的x_{T}x_{T}与图片x_{0}x_{0}是**同维度**的。
 
 <div style="text-align:center">
 <img src="./figs/generative_model.png">
@@ -10,14 +10,14 @@ Diffusion Model和其他生成模型最大的区别是它的latent code(z)和原
 
 所谓前向过程，即往图片上加噪声的过程。虽然这个步骤无法做到图片生成，但是这是理解diffusion model以及**构建训练样本GT**至关重要的一步。
 
-给定真实图片$x_{0} \sim q(x)$，diffusion前向过程通过$T$次累计对其添加高斯噪声，得到$x_{1}, x_{2}, \ldots, x_{T}$，如下图的$q$过程。这里需要给定一系列的高斯分布方差的超参数$\{\beta_{t} \in \left(0, 1\right)\}_{t=1}^{T}$。前向过程由于每个时刻$t$只与$t-1$时刻有关，所以也可以看做马尔科夫过程：
+给定真实图片x_{0} \sim q(x)x_{0} \sim q(x)，diffusion前向过程通过TT次累计对其添加高斯噪声，得到x_{1}, x_{2}, \ldots, x_{T}x_{1}, x_{2}, \ldots, x_{T}，如下图的qq过程。这里需要给定一系列的高斯分布方差的超参数\{\beta_{t} \in \left(0, 1\right)\}_{t=1}^{T}\{\beta_{t} \in \left(0, 1\right)\}_{t=1}^{T}。前向过程由于每个时刻tt只与t-1t-1时刻有关，所以也可以看做马尔科夫过程：
 
 $$
 q\left(x_{t} \mid x_{t-1}\right) = \mathcal{N}\left(x_{t}; \sqrt{1-\beta_{t}}x_{t-1}, \beta_{t}\mathbf{I}\right) \qquad q\left(x_{1:T} \mid x_{0}\right) = \prod_{t=1}^{T}q\left(x_{t} \mid x_{t-1}\right)
 \tag{1}
 $$
 
-这个过程中，随着$t$的增大，$x_{t}$越来越接近纯噪声。当$T \rightarrow \infty$，$x_{T}$是完全的高斯噪声(下面会证明，且与均值$\sqrt{1-\beta_{t}}$的选择有关)。且实际中$\beta_{t}$随着$t$增大是递增的，即$\beta_{1} \lt \beta_{2} \lt \ldots \lt \beta_{T}$。在GLIDE的code中，$\beta_{t}$是由0.0001到0.02线性插值(以$T=1000$为基准，$T$增加，$\beta_{T}$对应降低)。
+这个过程中，随着tt的增大，x_{t}x_{t}越来越接近纯噪声。当T \rightarrow \inftyT \rightarrow \infty，x_{T}x_{T}是完全的高斯噪声(下面会证明，且与均值\sqrt{1-\beta_{t}}\sqrt{1-\beta_{t}}的选择有关)。且实际中\beta_{t}\beta_{t}随着tt增大是递增的，即\beta_{1} \lt \beta_{2} \lt \ldots \lt \beta_{T}\beta_{1} \lt \beta_{2} \lt \ldots \lt \beta_{T}。在GLIDE的code中，\beta_{t}\beta_{t}是由0.0001到0.02线性插值(以T=1000T=1000为基准，TT增加，\beta_{T}\beta_{T}对应降低)。
 
 <div style="text-ailgn:center">
 <img src="./figs/ddpm.png">
@@ -28,16 +28,16 @@ $$
 前向过程结束介绍前，需要讲述一下diffusion在实现和推导过程中要用到的两个重要特征。
 
 #### 特性1：重参数(reparameterization trick)
-重参数技巧在很多工作(Gumbel Softmax, VAE)中有所引用。如果我们要从某个分布中随机采样(高斯分布)一个样本，这个过程是无法反传梯度的。而这个通过高斯噪声采样得到的$x_{t}$的过程在diffusion中到处都是，因此我们需要通过重参数技巧来使得它可微。最通常的做法是把随机性通过一个独立的随机变量($\epsilon$)引导过去。举个例子，如果要从高斯分布$z \sim \mathcal{N}\left(z; \mu_{\theta}, \sigma_{\theta}^{2}\mathbf{I}\right)$采样一个$z$，我们可以写成：
+重参数技巧在很多工作(Gumbel Softmax, VAE)中有所引用。如果我们要从某个分布中随机采样(高斯分布)一个样本，这个过程是无法反传梯度的。而这个通过高斯噪声采样得到的x_{t}x_{t}的过程在diffusion中到处都是，因此我们需要通过重参数技巧来使得它可微。最通常的做法是把随机性通过一个独立的随机变量(\epsilon\epsilon)引导过去。举个例子，如果要从高斯分布z \sim \mathcal{N}\left(z; \mu_{\theta}, \sigma_{\theta}^{2}\mathbf{I}\right)z \sim \mathcal{N}\left(z; \mu_{\theta}, \sigma_{\theta}^{2}\mathbf{I}\right)采样一个zz，我们可以写成：
 
 $$
     z = \mu_{\theta} + \sigma_{\theta} \odot \epsilon, \quad \epsilon \sim \mathcal{N}\left(0, \mathbf{I}\right)
 $$
 
-上式的$z$依旧是有随机性的，且满足均值为$\mu_{\theta}$方差为$\sigma_{\theta}^{2}$的高斯分布。这里的$\mu_{\theta}$，$\sigma_{\theta}^{2}$可以是由参数$\theta$的神经网络推断得到的。整个“采样”过程依旧梯度可导，随机性被转嫁到了$\epsilon$上。
+上式的zz依旧是有随机性的，且满足均值为\mu_{\theta}\mu_{\theta}方差为\sigma_{\theta}^{2}\sigma_{\theta}^{2}的高斯分布。这里的\mu_{\theta}\mu_{\theta}，\sigma_{\theta}^{2}\sigma_{\theta}^{2}可以是由参数\theta\theta的神经网络推断得到的。整个“采样”过程依旧梯度可导，随机性被转嫁到了\epsilon\epsilon上。
 
-#### 特性2：任意时刻的$x_{t}$可以由$x_{0}$和$\beta$表示
-能够通过$x_{0}$和$\beta$快速得到$x_{t}$，对后续diffusion model的推断和推导有巨大作用。首先我们假设$\alpha_{t} = 1 - \beta_{t}$，并且$\bar{\alpha_{t}}=\prod_{i=1}^{T}\alpha_{i}$，由式$(1)$展开$x_{t}$可以得到：
+#### 特性2：任意时刻的x_{t}x_{t}可以由x_{0}x_{0}和\beta\beta表示
+能够通过x_{0}x_{0}和\beta\beta快速得到x_{t}x_{t}，对后续diffusion model的推断和推导有巨大作用。首先我们假设\alpha_{t} = 1 - \beta_{t}\alpha_{t} = 1 - \beta_{t}，并且\bar{\alpha_{t}}=\prod_{i=1}^{T}\alpha_{i}\bar{\alpha_{t}}=\prod_{i=1}^{T}\alpha_{i}，由式(1)(1)展开x_{t}x_{t}可以得到：
 
 $$
 \begin{aligned}
@@ -45,14 +45,14 @@ $$
     & = \sqrt{\alpha_{t}} x_{t-1} + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
     & = \sqrt{\alpha_{t}} \left(\sqrt{\alpha_{t-1}} x_{t-2} + \sqrt{1-\alpha_{t-1}}\epsilon_{t-2}\right) + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
     & = \sqrt{\alpha_{t} \alpha_{t-1}}x_{t-2} + \left(\sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)} \epsilon_{t-2} + \sqrt{1-\alpha_{t}}\epsilon_{t-1}\right) \\
-    & = \sqrt{\alpha_{t} \alpha_{t-1}}x_{t-2} + \sqrt{1-\alpha_{t}\alpha_{t-1}}\bar{\epsilon}_{t-2} \quad \text { where } \bar{\epsilon}_{t-2} \sim \mathcal{N}\left(0, \mathbf{I}\right)  \text{ mergs two Gaussion $\left( \* \right)$}\\
+    & = \sqrt{\alpha_{t} \alpha_{t-1}}x_{t-2} + \sqrt{1-\alpha_{t}\alpha_{t-1}}\bar{\epsilon}_{t-2} \quad \text { where } \bar{\epsilon}_{t-2} \sim \mathcal{N}\left(0, \mathbf{I}\right)  \text{ mergs two Gaussion \left( \* \right)\left( \* \right)}\\
     & = \ldots \\
     & = \sqrt{\bar{\alpha}_{t}} x_{0} + \sqrt{1-\bar{\alpha}_{t}} \epsilon. \\
     q\left(x_{t} \mid x_{0}\right) & = \mathcal{N}\left(x_{t}; \sqrt{\bar{\alpha_{t}}} x_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right).
 \end{aligned}
 $$
 
-由于独立高斯分布的可加性，即$\mathcal{N}\left(0, \sigma_{1}^{2}\right) + \mathcal{N}\left(0, \sigma_{2}^{2}\right) \sim \mathcal{N}\left(0, \left(\sigma_{1}^{2} + \sigma_{2}^{2} \right)\right)$，所以
+由于独立高斯分布的可加性，即\mathcal{N}\left(0, \sigma_{1}^{2}\right) + \mathcal{N}\left(0, \sigma_{2}^{2}\right) \sim \mathcal{N}\left(0, \left(\sigma_{1}^{2} + \sigma_{2}^{2} \right)\right)\mathcal{N}\left(0, \sigma_{1}^{2}\right) + \mathcal{N}\left(0, \sigma_{2}^{2}\right) \sim \mathcal{N}\left(0, \left(\sigma_{1}^{2} + \sigma_{2}^{2} \right)\right)，所以
 
 $$
 \begin{aligned}
