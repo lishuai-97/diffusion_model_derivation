@@ -17,7 +17,7 @@ q\left(x_{t} \mid x_{t-1}\right) = \mathcal{N}\left(x_{t}; \sqrt{1-\beta_{t}}x_{
 \tag{1}
 $$
 
-这个过程中，随着$t$的增大，$x_{t}$越来越接近纯噪声。当$T \rightarrow \infin$，$x_{T}$是完全的高斯噪声(下面会证明，且与均值$\sqrt{1-\beta_{t}}$的选择有关)。且实际中$\beta_{t}$随着$t$增大是递增的，即$\beta_{1} \lt \beta_{2} \lt \ldots \lt \beta_{T}$。在GLIDE的code中，$\beta_{t}$是由0.0001到0.02线性插值(以$T=1000$为基准，$T$增加，$\beta_{T}$对应降低)。
+这个过程中，随着$t$的增大，$x_{t}$越来越接近纯噪声。当$T \rightarrow \infty$，$x_{T}$是完全的高斯噪声(下面会证明，且与均值$\sqrt{1-\beta_{t}}$的选择有关)。且实际中$\beta_{t}$随着$t$增大是递增的，即$\beta_{1} \lt \beta_{2} \lt \ldots \lt \beta_{T}$。在GLIDE的code中，$\beta_{t}$是由0.0001到0.02线性插值(以$T=1000$为基准，$T$增加，$\beta_{T}$对应降低)。
 
 <div style="text-ailgn:center">
 <img src="./figs/ddpm.png">
