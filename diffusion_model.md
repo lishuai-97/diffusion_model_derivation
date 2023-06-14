@@ -10,14 +10,14 @@ Diffusion Model和其他生成模型最大的区别是它的latent code(z)和原
 
 所谓前向过程，即往图片上加噪声的过程。虽然这个步骤无法做到图片生成，但是这是理解diffusion model以及**构建训练样本GT**至关重要的一步。
 
-给定真实图片$\mathbf{x}_{0} \sim q\left(\mathbf{x}\right)$，diffusion前向过程通过$\mathbin{T}$次累计对其添加高斯噪声，得到$\mathbf{x}_{1}, \mathbf{x}_{2}, \ldots, \mathbf{x}_{T}$，如下图的$q$过程。这里需要给定一系列的高斯分布方差的超参数$\{\beta_{t} \in \left(0, 1\right)\}_{t=1}^{T}$。前向过程由于每个时刻$t$只与$t-1$时刻有关，所以也可以看做马尔科夫过程：
+给定真实图片$x_{0} \sim q(x)$，diffusion前向过程通过$T$次累计对其添加高斯噪声，得到$x_{1}, x_{2}, \ldots, x_{T}$，如下图的$q$过程。这里需要给定一系列的高斯分布方差的超参数$\{\beta_{t} \in \left(0, 1\right)\}_{t=1}^{T}$。前向过程由于每个时刻$t$只与$t-1$时刻有关，所以也可以看做马尔科夫过程：
 
 $$
-q\left(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}\right) = \mathcal{N}\left(\mathbf{x}_{t}; \sqrt{1-\beta_{t}}\mathbf{x}_{t-1}, \beta_{t}\mathbf{I}\right) \qquad q\left(\mathbf{x}_{1:T} \mid \mathbf{x}_{0}\right) = \prod_{t=1}^{T}q\left(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}\right)
+q\left(x_{t} \mid x_{t-1}\right) = \mathcal{N}\left(x_{t}; \sqrt{1-\beta_{t}}x_{t-1}, \beta_{t}\mathbf{I}\right) \qquad q\left(x_{1:T} \mid x_{0}\right) = \prod_{t=1}^{T}q\left(x_{t} \mid x_{t-1}\right)
 \tag{1}
 $$
 
-这个过程中，随着$t$的增大，$\mathbf{x}_{t}$越来越接近纯噪声。当$T \rightarrow \infin$，$\mathbf{x}_{T}$是完全的高斯噪声(下面会证明，且与均值$\sqrt{1-\beta_{t}}$的选择有关)。且实际中$\beta_{t}$随着$t$增大是递增的，即$\beta_{1} \lt \beta_{2} \lt \ldots \lt \beta_{T}$。在GLIDE的code中，$\beta_{t}$是由0.0001到0.02线性插值(以$\mathcal{T}=1000$为基准，$\mathcal{T}$增加，$\beta_{T}$对应降低)。
+这个过程中，随着$t$的增大，$x_{t}$越来越接近纯噪声。当$T \rightarrow \infin$，$x_{T}$是完全的高斯噪声(下面会证明，且与均值$\sqrt{1-\beta_{t}}$的选择有关)。且实际中$\beta_{t}$随着$t$增大是递增的，即$\beta_{1} \lt \beta_{2} \lt \ldots \lt \beta_{T}$。在GLIDE的code中，$\beta_{t}$是由0.0001到0.02线性插值(以$T=1000$为基准，$T$增加，$\beta_{T}$对应降低)。
 
 <div style="text-ailgn:center">
 <img src="./figs/ddpm.png">
