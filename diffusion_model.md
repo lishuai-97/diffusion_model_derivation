@@ -49,7 +49,6 @@ x_{t} & = \sqrt{1-\beta_{t}}x_{t-1} + \beta_{t}\epsilon_{t-1} \quad \text{ where
 & =\ldots \\
 & =\sqrt{\bar{\alpha}_{t}}x_{0} + \sqrt{1-\bar{\alpha}_{t}}\epsilon. \\
 q\left(x_{t} \mid x_{0}\right) & = \mathcal{N}\left(x_{t}; \sqrt{\bar{\alpha_{t}}}x_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right).
-\tag{2}
 \end{aligned}
 $$
 
@@ -60,7 +59,7 @@ $$
     & \sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)}\epsilon_{t-2} \sim \mathcal{0, \alpha_{t}\left(1-\alpha_{t-1}\right)\mathbf{I}}, \\
     & \sqrt{1-\alpha_{t}}\epsilon_{t-1} \sim \mathcal{N}\left(0, \left(1-\alpha_{t}\right)\mathbf{I}\right), \\
     & \sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)}\epsilon_{t-2} + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \sim \mathcal{N}\left(0, \left[\alpha_{t}\left(1-\alpha_{t-1}\right) + \left(1-\alpha_{t}\right)\right]\mathbf{I}\right) \\
-    & = \mathcal{N}\left(0, \left(1-\alpha_{t}\alpha_{t-1}\right)\mathbf{I}\right). \tag{3}
+    & = \mathcal{N}\left(0, \left(1-\alpha_{t}\alpha_{t-1}\right)\mathbf{I}\right).
 \end{aligned}
 $$
 
