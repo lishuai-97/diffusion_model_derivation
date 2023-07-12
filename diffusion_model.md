@@ -1,23 +1,31 @@
 # Diffusion Model
-Diffusion Model和其他生成模型最大的区别是它的latent code(z)和原图是同尺寸大小的，当然最近也有基于压缩的latent diffusion model。一句话概括diffusion model，即存在一系列高斯噪声(TT轮)，将输入图片x_{0}x_{0}变为纯高斯噪声x_{T}x_{T}。而我们的模型则负责将x_{T}x_{T}复原回图片x_{0}x_{0}。这样一来其实diffusion model和GAN很像，都是给定噪声x_{T}x_{T}生成图片x_{0}x_{0}，但是要强调的是，这里的x_{T}x_{T}与图片x_{0}x_{0}是**同维度**的。
+Diffusion Model和其他生成模型最大的区别是它的latent code(z)和原图是同尺寸大小的，当然最近也有基于压缩的latent diffusion model。一句话概括diffusion model，即存在一系列高斯噪声($\mathbin{T}$轮)，将输入图片$\mathcal{x}_{0}$变为纯高斯噪声$\mathcal{x}_{T}$。而我们的模型则负责将$\mathcal{x}_{T}$复原回图片$\mathcal{x}_{0}$。这样一来其实diffusion model和GAN很像，都是给定噪声$\mathcal{x}_{T}$生成图片$\mathcal{x}_{0}$，但是要强调的是，这里的$\mathcal{x}_{T}$与图片$\mathcal{x}_{0}$是**同维度**的。
 
 <div style="text-align:center">
 <img src="./figs/generative_model.png">
 </div>
 
+---
 ## DDPM原理
+---
+### 问题概述
+首先，为了简化问题，我们定义**batch size=1**，也就是每轮只有一张输入图片。将此输入图片用符号$\mathbf{x}_{0}$表示。扩散模型中，我们希望通过不断的加随机噪音，经过$T$次后，图像变成一个服从标准正态分布的随机量，即$\mathbf{x}_{T} \sim \mathcal{N}(0, \mathbf{I})$。这样我们在推理过程中，随机抽样一个服从$\mathcal{N}(0, \mathbf{I})$分布的张量，就可以通过逆向降噪过程获得一个全新的图片。
+
+更一般化的，假设在添加$t$次噪音得到的图像为$\mathbf{x}_{t}$，如果通过$\mathbf{x}_{t}$的分布能够重构出$\mathbf{x}_{t-1}$的分布（注意不是$\mathbf{x}_{t}$本身），那么我们就能在之后的生成过程中抽样得到一个**具有随机性**的$\mathbf{x}_{t}$。如果能得到任意的$\mathbf{x}_{t-1}$，我们当然可以从$\mathbf{x}_{T}$重构出随机的$\mathbf{x}_{0}$. 
+ 
+---
 ### Diffusion前向过程
 
 所谓前向过程，即往图片上加噪声的过程。虽然这个步骤无法做到图片生成，但是这是理解diffusion model以及**构建训练样本GT**至关重要的一步。
 
-给定真实图片x_{0} \sim q(x)x_{0} \sim q(x)，diffusion前向过程通过TT次累计对其添加高斯噪声，得到x_{1}, x_{2}, \ldots, x_{T}x_{1}, x_{2}, \ldots, x_{T}，如下图的qq过程。这里需要给定一系列的高斯分布方差的超参数\{\beta_{t} \in \left(0, 1\right)\}_{t=1}^{T}\{\beta_{t} \in \left(0, 1\right)\}_{t=1}^{T}。前向过程由于每个时刻tt只与t-1t-1时刻有关，所以也可以看做马尔科夫过程：
+给定真实图片$\mathbf{x}_{0} \sim q\left(\mathbf{x}\right)$，diffusion前向过程通过$\mathbin{T}$次累计对其添加高斯噪声，得到$\mathbf{x}_{1}, \mathbf{x}_{2}, \ldots, \mathbf{x}_{T}$，如下图的$q$过程。这里需要给定一系列的高斯分布方差的超参数$\{\beta_{t} \in \left(0, 1\right)\}_{t=1}^{T}$。前向过程由于每个时刻$t$只与$t-1$时刻有关，所以也可以看做马尔科夫过程：
 
 $$
-q\left(x_{t} \mid x_{t-1}\right) = \mathcal{N}\left(x_{t}; \sqrt{1-\beta_{t}}x_{t-1}, \beta_{t}\mathbf{I}\right) \qquad q\left(x_{1:T} \mid x_{0}\right) = \prod_{t=1}^{T}q\left(x_{t} \mid x_{t-1}\right)
+q\left(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}\right) = \mathcal{N}\left(\mathbf{x}_{t}; \sqrt{1-\beta_{t}}\mathbf{x}_{t-1}, \beta_{t}\mathbf{I}\right) \qquad q\left(\mathbf{x}_{1:T} \mid \mathbf{x}_{0}\right) = \prod_{t=1}^{T}q\left(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}\right)
 \tag{1}
 $$
 
-这个过程中，随着tt的增大，x_{t}x_{t}越来越接近纯噪声。当T \rightarrow \inftyT \rightarrow \infty，x_{T}x_{T}是完全的高斯噪声(下面会证明，且与均值\sqrt{1-\beta_{t}}\sqrt{1-\beta_{t}}的选择有关)。且实际中\beta_{t}\beta_{t}随着tt增大是递增的，即\beta_{1} \lt \beta_{2} \lt \ldots \lt \beta_{T}\beta_{1} \lt \beta_{2} \lt \ldots \lt \beta_{T}。在GLIDE的code中，\beta_{t}\beta_{t}是由0.0001到0.02线性插值(以T=1000T=1000为基准，TT增加，\beta_{T}\beta_{T}对应降低)。
+这个过程中，随着$t$的增大，$\mathbf{x}_{t}$越来越接近纯噪声。当$T \rightarrow \infin$，$\mathbf{x}_{T}$是完全的高斯噪声(下面会证明，且与均值$\sqrt{1-\beta_{t}}$的选择有关)。且实际中$\beta_{t}$随着$t$增大是递增的，即$\beta_{1} \lt \beta_{2} \lt \ldots \lt \beta_{T}$。在GLIDE的code中，$\beta_{t}$是由0.0001到0.02线性插值(以$\mathcal{T}=1000$为基准，$\mathcal{T}$增加，$\beta_{T}$对应降低)。
 
 <div style="text-ailgn:center">
 <img src="./figs/ddpm.png">
@@ -28,62 +36,63 @@ $$
 前向过程结束介绍前，需要讲述一下diffusion在实现和推导过程中要用到的两个重要特征。
 
 #### 特性1：重参数(reparameterization trick)
-重参数技巧在很多工作(Gumbel Softmax, VAE)中有所引用。如果我们要从某个分布中随机采样(高斯分布)一个样本，这个过程是无法反传梯度的。而这个通过高斯噪声采样得到的x_{t}x_{t}的过程在diffusion中到处都是，因此我们需要通过重参数技巧来使得它可微。最通常的做法是把随机性通过一个独立的随机变量(\epsilon\epsilon)引导过去。举个例子，如果要从高斯分布z \sim \mathcal{N}\left(z; \mu_{\theta}, \sigma_{\theta}^{2}\mathbf{I}\right)z \sim \mathcal{N}\left(z; \mu_{\theta}, \sigma_{\theta}^{2}\mathbf{I}\right)采样一个zz，我们可以写成：
+重参数技巧在很多工作(Gumbel Softmax, VAE)中有所引用。如果我们要从某个分布中随机采样(高斯分布)一个样本，这个过程是无法反传梯度的。而这个通过高斯噪声采样得到的$\mathbf{x}_{t}$的过程在diffusion中到处都是，因此我们需要通过重参数技巧来使得它可微。最通常的做法是把随机性通过一个独立的随机变量($\epsilon$)引导过去。举个例子，如果要从高斯分布$z \sim \mathcal{N}\left(z; \mu_{\theta}, \sigma_{\theta}^{2}\mathbf{I}\right)$采样一个$z$，我们可以写成：
 
 $$
-    z = \mu_{\theta} + \sigma_{\theta} \odot \epsilon, \quad \epsilon \sim \mathcal{N}\left(0, \mathbf{I}\right)
+z = \mu_{\theta} + \sigma_{\theta} \odot \epsilon, \quad \epsilon \sim \mathcal{N}\left(0, \mathbf{I}\right)
 $$
 
-上式的zz依旧是有随机性的，且满足均值为\mu_{\theta}\mu_{\theta}方差为\sigma_{\theta}^{2}\sigma_{\theta}^{2}的高斯分布。这里的\mu_{\theta}\mu_{\theta}，\sigma_{\theta}^{2}\sigma_{\theta}^{2}可以是由参数\theta\theta的神经网络推断得到的。整个“采样”过程依旧梯度可导，随机性被转嫁到了\epsilon\epsilon上。
+上式的$z$依旧是有随机性的，且满足均值为$\mu_{\theta}$方差为$\sigma_{\theta}^{2}$的高斯分布。这里的$\mu_{\theta}$，$\sigma_{\theta}^{2}$可以是由参数$\theta$的神经网络推断得到的。整个“采样”过程依旧梯度可导，随机性被转嫁到了$\epsilon$上。
 
-#### 特性2：任意时刻的x_{t}x_{t}可以由x_{0}x_{0}和\beta\beta表示
-能够通过x_{0}x_{0}和\beta\beta快速得到x_{t}x_{t}，对后续diffusion model的推断和推导有巨大作用。首先我们假设\alpha_{t} = 1 - \beta_{t}\alpha_{t} = 1 - \beta_{t}，并且\bar{\alpha_{t}}=\prod_{i=1}^{T}\alpha_{i}\bar{\alpha_{t}}=\prod_{i=1}^{T}\alpha_{i}，由式(1)(1)展开x_{t}x_{t}可以得到：
+#### 特性2：任意时刻的$\mathbf{x}_{t}$可以由$\mathbf{x}_{0}$和$\beta$表示
+能够通过$\mathbf{x}_{0}$和$\beta$快速得到$\mathbf{x}_{t}$，对后续diffusion model的推断和推导有巨大作用。首先我们假设$\alpha_{t} = 1 - \beta_{t}$，并且$\bar{\alpha_{t}}=\prod_{i=1}^{T}\alpha_{i}$，由式$(1)$展开$\mathbf{x}_{t}$可以得到：
 
 $$
 \begin{aligned}
-    x_{t} & = \sqrt{1-\beta_{t}} x_{t-1} + \beta_{t}\epsilon_{t-1} \quad \text{ where } \epsilon_{t-1}, \epsilon_{t-2}, \ldots \sim \mathcal{N}\left(0, \mathbf{I}\right)\\
-    & = \sqrt{\alpha_{t}} x_{t-1} + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
-    & = \sqrt{\alpha_{t}} \left(\sqrt{\alpha_{t-1}} x_{t-2} + \sqrt{1-\alpha_{t-1}}\epsilon_{t-2}\right) + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
-    & = \sqrt{\alpha_{t} \alpha_{t-1}}x_{t-2} + \left(\sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)} \epsilon_{t-2} + \sqrt{1-\alpha_{t}}\epsilon_{t-1}\right) \\
-    & = \sqrt{\alpha_{t} \alpha_{t-1}}x_{t-2} + \sqrt{1-\alpha_{t}\alpha_{t-1}}\bar{\epsilon}_{t-2} \quad \text { where } \bar{\epsilon}_{t-2} \sim \mathcal{N}\left(0, \mathbf{I}\right)  \text{ mergs two Gaussion \left( \* \right)\left( \* \right)}\\
-    & = \ldots \\
-    & = \sqrt{\bar{\alpha}_{t}} x_{0} + \sqrt{1-\bar{\alpha}_{t}} \epsilon. \\
-    q\left(x_{t} \mid x_{0}\right) & = \mathcal{N}\left(x_{t}; \sqrt{\bar{\alpha_{t}}} x_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right).
+\mathbf{x}_{t} & = \sqrt{1-\beta_{t}}\mathbf{x}_{t-1} + \sqrt{\beta_{t}}\epsilon_{t-1} \quad \text{ where } \epsilon_{t-1}, \epsilon_{t-2}, \ldots \sim \mathcal{N}(0, \mathbf{I})\\
+& =\sqrt{\alpha_{t}}\mathbf{x}_{t-1} + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
+& =\sqrt{\alpha_{t}}\left(\sqrt{\alpha_{t-1}}\mathbf{x}_{t-2} + \sqrt{1-\alpha_{t-1}}\epsilon_{t-2}\right) + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \\
+& =\sqrt{\alpha_{t}\alpha_{t-1}}\mathbf{x}_{t-2} + \left(\sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)}\epsilon_{t-2} + \sqrt{1-\alpha_{t}}\epsilon_{t-1}\right) \\
+& =\sqrt{\alpha_{t} \alpha_{t-1}}\mathbf{x}_{t-2} + \sqrt{1-\alpha_{t}\alpha_{t-1}}\bar{\epsilon}_{t-2} \quad \text {where } \bar{\epsilon}_{t-2} \sim \mathcal{N}(0, \mathbf{I})  \text{ mergs two Gaussion$\left(*\right)$}\\
+& =\ldots \\
+& =\sqrt{\bar{\alpha}_{t}}\mathbf{x}_{0} + \sqrt{1-\bar{\alpha}_{t}}\epsilon. \\
+q\left(\mathbf{x}_{t} \mid \mathbf{x}_{0}\right) & = \mathcal{N}\left(\mathbf{x}_{t}; \sqrt{\bar{\alpha_{t}}}\mathbf{x}_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right).
+\tag{2}
 \end{aligned}
 $$
 
-由于独立高斯分布的可加性，即\mathcal{N}\left(0, \sigma_{1}^{2}\right) + \mathcal{N}\left(0, \sigma_{2}^{2}\right) \sim \mathcal{N}\left(0, \left(\sigma_{1}^{2} + \sigma_{2}^{2} \right)\right)\mathcal{N}\left(0, \sigma_{1}^{2}\right) + \mathcal{N}\left(0, \sigma_{2}^{2}\right) \sim \mathcal{N}\left(0, \left(\sigma_{1}^{2} + \sigma_{2}^{2} \right)\right)，所以
+由于独立高斯分布的可加性，即$\mathcal{N}\left(0, \sigma_{1}^{2}\right) + \mathcal{N}\left(0, \sigma_{2}^{2}\right) \sim \mathcal{N}\left(0, \left(\sigma_{1}^{2} + \sigma_{2}^{2} \right)\right)$，所以
 
 $$
 \begin{aligned}
     & \sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)}\epsilon_{t-2} \sim \mathcal{0, \alpha_{t}\left(1-\alpha_{t-1}\right)\mathbf{I}}, \\
     & \sqrt{1-\alpha_{t}}\epsilon_{t-1} \sim \mathcal{N}\left(0, \left(1-\alpha_{t}\right)\mathbf{I}\right), \\
     & \sqrt{\alpha_{t}\left(1-\alpha_{t-1}\right)}\epsilon_{t-2} + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \sim \mathcal{N}\left(0, \left[\alpha_{t}\left(1-\alpha_{t-1}\right) + \left(1-\alpha_{t}\right)\right]\mathbf{I}\right) \\
-    & = \mathcal{N}\left(0, \left(1-\alpha_{t}\alpha_{t-1}\right)\mathbf{I}\right).
+    & = \mathcal{N}\left(0, \left(1-\alpha_{t}\alpha_{t-1}\right)\mathbf{I}\right). \tag{3}
 \end{aligned}
 $$
 
-因此可以混合两个高斯分布得到标准差为$\sqrt{1-\alpha_{t}\alpha_{t-1}}$的混合高斯分布，式$(2)$中的$\bar{\epsilon_{t-2}}$仍然是标准高斯分布。而任意时刻的$x_{t}$满足$q\left(x_{t} \mid x_{0}\right) = \mathcal{N}\left(x_{t}; \sqrt{\bar{\alpha_{t}}}x_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right)$.
+因此可以混合两个高斯分布得到标准差为$\sqrt{1-\alpha_{t}\alpha_{t-1}}$的混合高斯分布，式$(2)$中的$\bar{\epsilon_{t-2}}$仍然是标准高斯分布。而任意时刻的$\mathbf{x}_{t}$满足$q\left(\mathbf{x}_{t} \mid \mathbf{x}_{0}\right) = \mathcal{N}\left(\mathbf{x}_{t}; \sqrt{\bar{\alpha_{t}}}\mathbf{x}_{0}, \left(1-\bar{\alpha_{t}}\right)\mathbf{I}\right)$.
 
-通过$Eq(2)$、$(3)$，可以发现当$\mathbin{T} \rightarrow \infty, x_{T} \sim \mathcal{N}\left(0, \mathbf{I}\right)$，所以$\sqrt{1-\beta_{t}}$的均值系数能够稳定保证$x_{T}$最后收敛到方差为1的保准高斯分布，且在$Eq(3)$的推导中也更为简洁优雅。
+通过$Eq(2)$、$(3)$，可以发现当$\mathbin{T} \rightarrow \infin, \mathbf{x}_{T} \sim \mathcal{N}\left(0, \mathbf{I}\right)$，所以$\sqrt{1-\beta_{t}}$的均值系数能够稳定保证$\mathbf{x}_{T}$最后收敛到方差为1的保准高斯分布，且在$Eq(3)$的推导中也更为简洁优雅。
 
 ---
 
 ### Diffusion逆向(推断)过程
 
-如果说前向过程(forward)是加噪的过程，那么逆向过程(reverse)就是diffusion的去噪推断过程。如果我们能够逐步得到逆转后的分布$q\left(x_{t-1} \mid x_{t}\right)$，就可以从标准的高斯分布$x_{T} \sim \mathbf{N}\left(0, \mathbf{I}\right)$还原出原图$x_{0}$。在文献[1]中证明了如果$q\left(x_{t} \mid x_{t-1}\right)$满足高斯分布且$\beta_{t}$足够小，$q\left(x_{t-1} \mid x_{t}\right)$仍然是一个高斯分布。然而我们无法简单推断$q\left(x_{t-1} \mid x_{t}\right)$，因此我们使用深度学习模型(参数为$\theta$，目前主流是U-Net+Attention的结构)去预测这样一个逆向分布$p_{\theta}$(类似VAE)：
+如果说前向过程(forward)是加噪的过程，那么逆向过程(reverse)就是diffusion的去噪推断过程。如果我们能够逐步得到逆转后的分布$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right)$，就可以从标准的高斯分布$\mathbf{x}_{T} \sim \mathbf{N}\left(0, \mathbf{I}\right)$还原出原图$\mathbf{x}_{0}$。在文献[1]中证明了如果$q\left(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}\right)$满足高斯分布且$\beta_{t}$足够小，$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right)$仍然是一个高斯分布。然而我们无法简单推断$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right)$，因此我们使用深度学习模型(参数为$\theta$，目前主流是U-Net+Attention的结构)去预测这样一个逆向分布$p_{\theta}$(类似VAE)：
 
 $$
 \begin{aligned}
-    p_{\theta}\left(X_{0:T}\right) & = p\left(x_{T}\right)\prod_{t=1}^{T}p_{\theta}\left(x_{t-1} \mid x_{t}\right);  \\
-    p_{\theta}\left(x_{t-1} \mid x_{t}\right) & = \mathcal{N}\left(x_{t-1}; \boldsymbol{\mu}_{\theta}\left(x_{t}, t\right), \boldsymbol{\Sigma}_{\theta}\left(x_{t}, t\right)\right).
+    p_{\theta}\left(\mathbin{X}_{0:T}\right) & = p\left(\mathbf{x}_{T}\right)\prod_{t=1}^{T}p_{\theta}\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right);  \\
+    p_{\theta}\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right) & = \mathcal{N}\left(\mathbf{x}_{t-1}; \boldsymbol{\mu}_{\theta}\left(\mathbf{x}_{t}, t\right), \boldsymbol{\Sigma}_{\theta}\left(\mathbf{x}_{t}, t\right)\right).
 \end{aligned}
 $$
 
-虽然我们无法得到逆转后的分布$q\left(x_{t-1} \mid x_{t}\right)$，但是如果知道$x_{0}$，我们是可以通过贝叶斯公式得到$q\left(x_{t-1} \mid x_{t}, x_{0}\right)$为：
+虽然我们无法得到逆转后的分布$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right)$，但是如果知道$\mathbf{x}_{0}$，我们是可以通过贝叶斯公式得到$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right)$为：
 
 $$
-q\left(x_{t-1} \mid x_{t}, x_{0}\right) = \mathcal{N}\left(x_{t-1}; \tilde{\mu}\left(x_{t}, x_{0}\right), \tilde{\beta_{t}}\mathbf{I}\right)
+q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right) = \mathcal{N}\left(\mathbf{x}_{t-1}; \tilde{\mu}\left(\mathbf{x}_{t}, \mathbf{x}_{0}\right), \tilde{\beta_{t}}\mathbf{I}\right) \tag{8}
 $$
 
 过程如下：
@@ -98,7 +107,7 @@ $$
     & = q\left(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}\right)\frac{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{0} \right)}{q\left(\mathbf{x}_{t} \mid \mathbf{x}_{0}\right)} \\
     & \propto \exp \left(-\frac{1}{2}\left(\frac{\left(\mathbf{x}_{t}-\sqrt{\alpha_{t}} \mathbf{x}_{t-1}\right)^{2}}{\beta_{t}} + \frac{\left(\mathbf{x}_{t-1}-\sqrt{\bar{\alpha}_{t-1}} \mathbf{x}_{0}\right)^{2}}{1-\bar{\alpha}_{t-1}} - \frac{\left(\mathbf{x}_{t}-\sqrt{\bar{\alpha}_{t}} \mathbf{x}_{0}\right)^{2}}{1-\bar{\alpha}_{t}}\right)\right) \\
     & =\exp \left(-\frac{1}{2}\left(\frac{\mathbf{x}_{t}^{2}-2 \sqrt{\alpha_{t}} \mathbf{x}_{t} \mathbf{x}_{t-1}+\alpha_{t} \mathbf{x}_{t-1}^{2}}{\beta_{t}}+\frac{\mathbf{x}_{t-1}^{2}-2 \sqrt{\bar{\alpha}_{t-1}} \mathbf{x}_{0} \mathbf{x}_{t-1}+\bar{\alpha}_{t-1} \mathbf{x}_{0}^{2}}{1-\bar{\alpha}_{t-1}}-\frac{\left(\mathbf{x}_{t}-\sqrt{\bar{\alpha}_{t}} \mathbf{x}_{0}\right)^{2}}{1-\bar{\alpha}_{t}}\right)\right) \\
-    & = \exp \left(-\frac{1}{2}(\underbrace{\left(\frac{\alpha_{t}}{\beta_{t}}+\frac{1}{1-\bar{\alpha}_{t-1}}\right) \mathbf{x}_{t-1}^{2}}_{\mathbf{x}_{t-1} \text { 方差 }}-\underbrace{\left(\frac{2 \sqrt{\alpha_{t}}}{\beta_{t}} \mathbf{x}_{t}+\frac{2 \sqrt{\bar{\alpha}_{t-1}}}{1-\bar{\alpha}_{t-1}} \mathbf{x}_{0}\right) \mathbf{x}_{t-1}}_{x_{t-1} \text { 均值 }}+\underbrace{C\left(\mathbf{x}_{t}, \mathbf{x}_{0}\right)}_{\text {与 } x_{t-1} \text { 方关 }})\right) .
+    & = \exp \left(-\frac{1}{2}\left(\underbrace{\left(\frac{\alpha_{t}}{\beta_{t}}+\frac{1}{1-\bar{\alpha}_{t-1}}\right) \mathbf{x}_{t-1}^{2}}_{\mathbf{x}_{t-1} \text { 方差 }}-\underbrace{\left(\frac{2 \sqrt{\alpha_{t}}}{\beta_{t}} \mathbf{x}_{t}+\frac{2 \sqrt{\bar{\alpha}_{t-1}}}{1-\bar{\alpha}_{t-1}} \mathbf{x}_{0}\right) \mathbf{x}_{t-1}}_{x_{t-1} \text { 均值 }}+\underbrace{C\left(\mathbf{x}_{t}, \mathbf{x}_{0}\right)}_{\text {与 } x_{t-1} \text { 方关 }}\right)\right) .
 \end{aligned}
 $$
 
@@ -119,7 +128,7 @@ $$
 \begin{aligned}
     & \frac{1}{\sigma^{2}}=\frac{1}{\tilde{\beta}_{t}}=\left(\frac{\alpha_{t}}{\beta_{t}}+\frac{1}{1-\bar{\alpha}_{t-1}}\right) ; \quad \tilde{\beta}_{t}=\frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_{t}} \cdot \beta_{t} \\
     & \frac{2 \mu}{\sigma^{2}}=\frac{2 \tilde{\mu}_{t}\left(\mathbf{x}_{t}, \mathbf{x}_{0}\right)}{\tilde{\beta}_{t}}=\left(\frac{2 \sqrt{\alpha_{t}}}{\beta_{t}} \mathbf{x}_{t}+\frac{2 \sqrt{\bar{\alpha}_{t-1}}}{1-\bar{\alpha}_{t-1}} \mathbf{x}_{0}\right) ; \\
-    & \tilde{\mu}_{t}\left(x_{t}, x_{0}\right)=\frac{{ }_{a_{t}}\left(1-\bar{\alpha}_{t-1}\right)}{1-\bar{\alpha}_{t}} \mathbf{x}_{t}+\frac{\sqrt{\bar{\alpha}_{t-1}} \beta_{t}}{1-\bar{\alpha}_{t}} \mathbf{x}_{0}. \tag{4}
+    & \tilde{\mu}_{t}\left(x_{t}, x_{0}\right)=\frac{\sqrt{{\alpha_{t}}}\left(1-\bar{\alpha}_{t-1}\right)}{1-\bar{\alpha}_{t}} \mathbf{x}_{t}+\frac{\sqrt{\bar{\alpha}_{t-1}} \beta_{t}}{1-\bar{\alpha}_{t}} \mathbf{x}_{0}. \tag{4}
 \end{aligned}   
 $$
 
@@ -138,12 +147,14 @@ $$
 \mu_{\theta}\left(\mathbf{x}_{t}, t\right) = \frac{1}{\sqrt{\alpha_{t}}}\left(\mathbf{x}_{t} - \frac{\beta_{t}}{\sqrt{1-\bar{\alpha}_{t}}}\epsilon_{\theta}\left(\mathbf{x}_{t}, t\right)\right) \tag{5}
 $$
 
+---
 这样一来，DDPM的每一步的推断可以总结为：
 
 (1) 每个时间步通过$\mathbf{x}_{t}$和$t$来预测高斯噪声$\epsilon_{\theta}\left(\mathbf{x}_{t}, t\right)$，随后由式$(5)$得到均值$\mu_{\theta}\left(\mathbf{x}_{t}, t\right)$.  
 (2) 得到方差$\boldsymbol{\Sigma}_{\theta}\left(\mathbf{x}_{t}, t\right)$，DDPM中使用untrained $\boldsymbol{\Sigma}_{\theta}\left(\mathbf{x}_{t}, t\right) = \tilde{\beta}_{t}$，且认为$\tilde{\beta}_{t}=\beta_{t}$和$\tilde{\beta}_{t}=\frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_{t}} \cdot \beta_{t}$结果近似，在GLIDE中则是根据网络预测trainable方差$\boldsymbol{\Sigma}_{\theta}\left(\mathbf{x}_{t}, t\right)$.  
 (3) 根据$p_{\theta}\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right) = \mathcal{N}\left(\mathbf{x}_{t-1}; \boldsymbol{\mu}_{\theta}\left(\mathbf{x}_{t}, t\right), \boldsymbol{\Sigma}_{\theta}\left(\mathbf{x}_{t}, t\right)\right)$得到$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}\right)$的估计，利用重参数技巧得到$\mathbf{x}_{t-1}$.
 
+---
 ### Diffusion训练
 搞清楚diffusion的逆向过程之后，我们算是搞清楚diffusion的推断过程了。但是如何训练diffusion model以得到靠谱的$\boldsymbol{\mu}_{\theta}\left(\mathbf{x}_{t}, t\right)$和$\boldsymbol{\Sigma}_{\theta}\left(\mathbf{x}_{t}, t\right)$呢？通过对真实数据分布下，最大化模型预测分布的对数似然，即优化在$\mathbf{x}_{0} \sim q\left(\mathbf{x}_{0}\right)$下的$p_{\theta}\left(\mathbf{x}_{0}\right)$交叉熵:
 
@@ -231,6 +242,7 @@ $$
 \end{aligned}
 $$
 
+---
 进一步对$\mathcal{L}_{VLB}$推导，可以得到熵与多个$KL$散度的累加：
 $$
 \begin{aligned}
@@ -246,8 +258,9 @@ $$
 \end{aligned}
 $$
 
-也可以写成：
+注：上面推导的最后一步将$q(\mathbf{x}_{0:T})$表示为$q(\mathbf{x}_{1:T} \mid \mathbf{x}_{0})q(\mathbf{x}_{0})$，再将对应的$q$放入括号里即可得到。
 
+也可以写成：
 
 $$
 \begin{aligned}
@@ -379,21 +392,201 @@ $$
 
 其中$n=tr(I_{d})$即矩阵阶数、高斯分布的维度。
 
+
+<!-- ### 加速Diffusion采样和方差的选择(DDIM)
+DDPM的高质量生成依赖于较大的$T$(一般为1000或以上)，这就导致diffusion的前向过程非常缓慢。在Denoising Diffusion Implicit Model (DDIM)[2]中提出了一种牺牲多样性来换取更快推断的手段。
+
+根据**特性2**和独立高斯分布的可加性，我们可以得到$\mathbf{x}_{t-1}$为：
+
+$$
+\begin{aligned}
+    \mathbf{x}_{t-1} & = \sqrt{\bar{\alpha}_{t-1}}\mathbf{x}_{0} + \sqrt{1-\bar{\alpha}_{t-1}}\epsilon_{t-1} \\
+    & = \sqrt{\bar{\alpha}_{t-1}}\mathbf{x}_{0} + \sqrt{1-\bar{\alpha}_{t-1} - \sigma_{t}^{2}}\epsilon_{t} + \sigma_{t}^{2}\bar{\epsilon}_{t} \quad \text{ 独立高斯分布的可加性 }\\
+    & = \sqrt{\bar{\alpha}_{t-1}}\mathbf{x}_{0} + \sqrt{1-\bar{\alpha}_{t-1} - \sigma_{t}^{2}}\left(\frac{\mathbf{x}_{t} - \sqrt{\bar{\alpha}_{t}}\mathbf{x}_{0}}{\sqrt{1-\bar{\alpha}_{t}}}\right) + \sigma_{t}^{2}\epsilon_{t} \\
+    q_{\sigma}(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}) & = \mathcal{N}(\mathbf{x}_{t-1}; \sqrt{\bar{\alpha}_{t-1}}\mathbf{x}_{0} + \sqrt{1-\bar{\alpha}_{t-1} - \sigma_{t}^{2}}\left(\frac{\mathbf{x}_{t} - \sqrt{\bar{\alpha}_{t}}\mathbf{x}_{0}}{\sqrt{1-\bar{\alpha}_{t}}}\right), \sigma_{t}^{2}\mathbf{I}).
+\end{aligned}
+$$
+
+不同于(5)和(8)，上式将方差$\sigma_{t}^{2}$引入到了均值中，当$\sigma_{t}^{2} = \tilde{\beta}_{t} = \frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_{t}}\beta_{t}$时，上式与(8)等价。
+
+在DDIM中把由上式经过贝叶斯得到的$q_{\sigma}(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}, \mathbf{x}_{0})$称为非马尔科夫链，因为$\mathbf{x}_{t}$的概率同时依赖于$\mathbf{x}_{t-1}$和$\mathbf{x}_{0}$。DDIM进一步定义了$\sigma_{t}(\eta)^{2} = \eta \cdot \tilde{\beta}_{t}$。当$\eta=0$时，diffusion sample过程会丧失所有随机性从而得到一个deterministic的结果(但是可以改变$\mathbf{x}_{T}$)。而$\eta=1$则DDIM等价于DDPM(使用$\tilde{\beta}_{t}$作为方差的版本)。用随机性换取生成性功能的类似操作在GAN中也可以通过对Latent code操作实现。 -->
+
 ---
+### 为什么DDPM一定要这么多次采样？
+首先我们先思考一下，如何可以加快DDPM的生成效率。最容易想到的两种方法，减小$T$，“跳步”(i.e.不再严格按照$t$到$t-1$的顺序来采样)，下面我们依次讨论：
+
+1. **减小$T$值行不行？**  
+   不行，在DDPM中，我们有公式
+   $$\mathbf{x}_{t} = \sqrt{\alpha_{t}}\mathbf{x}_{t-1} + \sqrt{1-\alpha_{t}}\epsilon_{t-1} \tag{1}$$
+   其中$\alpha_{t} = 1 - \beta_{t}$，由于对于每个$t$，$1 - \alpha_{t}$都接近于0，$\alpha_{t}$都接近于1，这是为了：  
+   - 噪声的方差$1 - \alpha_{t}$较小，保证前后分布均为正态分布的假设成立；
+   - $\mathbf{x}_{t-1}$的系数$\sqrt{\alpha_{t}}$要尽量接近于1，因为这样才能保证$t$时刻的噪声图尽量保留$t-1$时刻的大体分布，不至于一步就破坏掉原图分布，这样就不好还原了。
+  
+   同时我们通过推导，可以得到：
+   $$\mathbf{x}_{T} = \sqrt{\bar{\alpha}_{T}}\mathbf{x}_{0} + \sqrt{1 - \bar{\alpha}_{T}}\epsilon \tag{2}$$
+   其中$\bar{\alpha}_{T} = \prod_{i=1}^{T}\alpha_{i}$，我们希望在$T$时刻，也就是最后时刻，我们的$\mathbf{x}_{T}$是尽量服从标准正态分布的。因此我们希望$\sqrt{\bar{\alpha}_{T}}$尽可能趋向于0，$\sqrt{1 - \bar{\alpha}_{T}}$尽可能趋近于1。在$\alpha_{t}$接近于1的前提下，只能让$T$尽可能的大，才能满足我们最终的需求，这也就是为什么$T$的取值不能太小的原因，因为$\alpha_{t}$不能太小且我们需要$\sqrt{\bar{\alpha}_{t}}$尽可能的趋近于0。
+2. **为什么非要一步一步降噪，跳步行不行？**  
+   不行，注意，我们的优化目标虽然是噪声$\epsilon$的MSE，但实际这只是重参数的结果。我们的终极优化目标实际上是去拟合概率分布$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right)$。而我们求得这个分布均值的方法是用的贝叶斯公式：
+   $$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right) = q(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}, \mathbf{x}_{0}) \frac{q(\mathbf{x}_{t-1} \mid \mathbf{x}_{0})}{q(\mathbf{x}_{t} \mid \mathbf{x}_{0})} = q(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}) \frac{q(\mathbf{x}_{t-1} \mid \mathbf{x}_{0})}{q(\mathbf{x}_{t} \mid \mathbf{x}_{0})} \tag{3}$$
+   其中，等式右边的三个概率分布，都是通过一个非常重要的假设得到的，那就是我们的**马尔科夫性质**！因此我们的采样必须要严格遵照马尔科夫性质，也就是必须从$\mathbf{x}_{t}$到$\mathbf{x}_{t-1}$一步一步来，不能“跳步”。
+3. **由式(2)，如果我们预测出了$\epsilon$，直接移项由$\mathbf{x}_{t}$直接得出$\mathbf{x}_{0}$行不行？**  
+   不行，原因同问题2一样。
 
 
+**既然不能跳步的原因是马尔科夫性质的约束，那假设我们不再让这个过程是马尔科夫的(Non-Markovian)了，现在我们可不可以跳步了？答案是可以的，并且这就是DDIM所做的事情**
+
+---
+### DDIM是如何去马尔科夫化的？
+由于我们现在假设我们不再有马尔科夫性质，因此式$(3)$要改写成如下形式:
+
+$$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right) = q(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}, \mathbf{x}_{0}) \frac{q(\mathbf{x}_{t-1} \mid \mathbf{x}_{0})}{q(\mathbf{x}_{t} \mid \mathbf{x}_{0})} \tag{4}$$
+
+由假设不再是马尔科夫链，等号右边的三个分布，我们全都不知道了（因为式$(2)$是通过马尔科夫性质推导出来的），这怎么办？首先我们提出一个大胆的命题：**前向过程$q(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}, \mathbf{x}_{0})$一点都不重要，我们不需要知道。**（因为在DDPM的训练过程中根本没用到$q\left(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}\right)$，而是直接用的$q(\mathbf{x}_{t} \mid \mathbf{x}_{0})$一步到位。）
+
+而对于$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right)$的计算，我们可以假设一个分布$q_{\sigma}\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right)$，并且满足式子$(2)$中的$\mathbf{x}_{T} = \sqrt{\bar{\alpha}_{T}}\mathbf{x}_{0} + \sqrt{1 - \bar{\alpha}_{T}}\epsilon$依然成立。因为我们的前向训练过程是用到了$(2)$式的，所以为了让前向过程不变，我们要确保(2)式依然成立。
+
+我们可以通过待定系数法来求解，假设$q_{\sigma}\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right) \sim \mathcal{N}(k\mathbf{x}_{0}+m\mathbf{x}_{t}, \sigma^2\mathbf{I})$，于是我们有$\mathbf{x}_{t-1} = k\mathbf{x}_{0}+m\mathbf{x}_{t}+\sigma\epsilon$，由于我们假设$(2)$式依然成立，于是我们有$\mathbf{x}_{t} = \sqrt{\bar{\alpha}_{t}}\mathbf{x}_{0} + \sqrt{1 - \bar{\alpha}_{t}}\epsilon'$，其中$\epsilon, \epsilon'$都是服从标准正态分布。于是我们可以代入求解，有：
+
+$$
+\begin{aligned}
+    \mathbf{x}_{t-1} & = k\mathbf{x}_{0} + m\left(\sqrt{\bar{\alpha}_{t}}\mathbf{x}_{0} + \sqrt{1 - \bar{\alpha}_{t}}\epsilon'\right)+\sigma\epsilon \\
+    & = (k + m\sqrt{\bar{\alpha}_{t}})\mathbf{x}_{0} + (m\sqrt{1-\bar{\alpha}_{t}})\epsilon' + \sigma\epsilon \\
+    & = (k + m\sqrt{\bar{\alpha}_{t}})\mathbf{x}_{0} + \sqrt{m^2(1-\bar{\alpha}_{t})+ \sigma^2}\epsilon-- \text{高斯分布可加性} \tag{5}
+\end{aligned}
+$$
+
+接下来我们求解$k, m$，因为必须满足式$(2)$，因此我们要满足：
+
+$$
+\left\{
+    \begin{aligned}
+        & k + m\sqrt{\bar{\alpha}_{t}} = \sqrt{\bar{\alpha}_{t-1}} \\
+        & m^2(1-\bar{\alpha}_{t})+ \sigma^2 = 1 - \bar{\alpha}_{t-1}
+    \end{aligned}
+\right. \tag{6}
+$$
+
+通过求解上式我们可以得到：
+
+$$
+\left\{
+    \begin{aligned}
+        & m = \frac{\sqrt{1-\bar{\alpha}_{t-1}-\sigma^2}}{\sqrt{1-\bar{\alpha}_{t}}} \\
+        & k = \sqrt{\bar{\alpha}_{t-1}} - \sqrt{1-\bar{\alpha}_{t-1}-\sigma^{2}}\frac{\sqrt{\bar{\alpha}_{t}}}{\sqrt{1-\bar{\alpha}_{t}}}
+    \end{aligned}
+\right.
+$$
+
+最终我们可以得到新的$q_{\sigma}\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right)$分布，即：
+
+$$
+q_{\sigma}\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}\right) = \mathcal{N}\left(\mathbf{x}_{t-1}; \sqrt{\bar{\alpha}_{t-1}}\mathbf{x}_{0}+\sqrt{1-\bar{\alpha}_{t-1}-\sigma^{2}}\frac{\mathbf{x}_{t}-\sqrt{\bar{\alpha}_{t}}\mathbf{x}_{0}}{\sqrt{1-\bar{\alpha}_{t}}}, \sigma^{2}\mathbf{I}\right) \tag{7}
+$$
+
+这就是我们新的反向生成分布，也就是我们**新的要去拟合的“终极目标”**。当然，有了式$(7)$，通过式$(4)$我们也可以求出$q(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}, \mathbf{x}_{0})$.
+
+---
+### DDIM的采样过程
+这部分和DDPM是完全一样的（除了采样分布变成了$(7)$）。同样的，对式$(7)$中的均值进行重参数化，用$\mathbf{x}_{t}, \epsilon_{\theta}$来表示，有：
+
+$$
+\begin{aligned}
+    \mathbf{x}_{t-1} & = \sqrt{\bar{\alpha}_{t-1}}\mathbf{x}_{0} + \sqrt{1-\bar{\alpha}_{t-1}-\sigma^{2}}\frac{\mathbf{x}_{t}-\sqrt{\bar{\alpha}_{t}}\mathbf{x}_{0}}{\sqrt{1-\bar{\alpha}_{t}}} + \sigma\epsilon \\
+    & = \sqrt{\bar{\alpha}_{t-1}}\left(\frac{\mathbf{x}_{t} - \sqrt{1-\bar{\alpha}_{t}}\epsilon_{\theta}(\mathbf{x}_{t})}{\sqrt{\bar{\alpha}_{t}}}\right) + \sqrt{1-\bar{\alpha}_{t-1}-\sigma^{2}}\epsilon_{\theta}(\mathbf{x}_{t}) + \sigma\epsilon \tag{8}
+\end{aligned}
+$$
+
+其中，由**特性2**可得：$\mathbf{x}_{t} = \sqrt{\bar{\alpha}_{t}}\mathbf{x}_{0} + \sqrt{1 - \bar{\alpha}_{t}}\epsilon_{\theta}(\mathbf{x}_{t})$
+
+由于我们不再需要上式具有马尔科夫性质，因此我们可以将上式改写为：
+
+$$
+\mathbf{x}_{s} = \sqrt{\bar{\alpha}_{s}}\left(\frac{\mathbf{x}_{k} - \sqrt{1-\bar{\alpha}_{k}}\epsilon_{\theta}(\mathbf{x}_{k})}{\sqrt{\bar{\alpha}_{k}}}\right) + \sqrt{1-\bar{\alpha}_{s}-\sigma^{2}}\epsilon_{\theta}(\mathbf{x}_{k}) + \sigma\epsilon \tag{9}
+$$
+
+其中严格满足$s < k$。于是，我们就可以从时间序列$\{1, \ldots, T\}$中随机去一个长度为$l$的升序子序列，通过式$(9)$迭代采样$l$次最终得到我们想要的$\mathbf{x}_{0}$。
+
+到目前为止，我们基本完成了DDIM原理的推导，目前还有一个问题没解决，那就是$\sigma$的取值问题。原文的appendixB证明了无论$\sigma$取值为何，都不影响式（2）的成立。因此我们可以较为随意的取值。我们第一时间想到的就是令$\sigma^2=\frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_{t}}\beta_{t}$，即DDPM中$q(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0})$的方差。
+
+于是作者令$\sigma=\eta\sqrt{\frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_{t}}\beta_{t}}$，其中$\eta \in [0, 1]$。考虑两个边界值，
+
+当$\eta = 1$时，我们就回到了DDPM。
+
+- 当$\sigma=\eta\sqrt{\frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_{t}}\beta_{t}}$时，DDIM等价于DDPM。  
+  证：  
+  首先，对比DDPM和DDIM的分布$p(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0})$，其方差相等，因此只需证明均值相等即可，即下式子：
+  $$
+  \sqrt{\bar{\alpha}_{t-1}}\left(\frac{\mathbf{x}_{t} - \sqrt{1-\bar{\alpha}_{t}}\epsilon_{\theta}(\mathbf{x}_{t})}{\sqrt{\bar{\alpha}_{t}}}\right) + \sqrt{1-\bar{\alpha}_{t-1}-\sigma^{2}}\epsilon_{\theta}(\mathbf{x}_{t})  = \frac{1}{\sqrt{\alpha_{t}}}\left(\mathbf{x}_{t} - \frac{\beta_{t}}{\sqrt{1-\bar{\alpha_{t}}}}\epsilon_{\theta}(\mathbf{x}_{t})\right)
+  $$
+
+  下面证明：
+  $$
+  \begin{aligned}
+    & \sqrt{\bar{\alpha}_{t-1}}\left(\frac{\mathbf{x}_{t}-\sqrt{1-\bar{\alpha}_{t}} \epsilon_{\theta}\left(\mathbf{x}_{t}\right)}{\sqrt{\bar{\alpha}_{t}}}\right)+\sqrt{1-\bar{\alpha}_{t-1}-\sigma^{2}} \epsilon_{\theta}\left(x_{t}\right) \\
+    = & \frac{1}{\sqrt{\alpha_{t}}} x_{t}-\frac{1}{\sqrt{\alpha_{t}}} \sqrt{1-\bar{\alpha}_{t}} \epsilon_{\theta}\left(x_{t}\right)+\frac{\left(1-\bar{\alpha}_{t-1}\right) \sqrt{\alpha_{t}}}{\sqrt{1-\bar{\alpha}_{t}}} \epsilon_{\theta}\left(x_{t}\right) \\
+    = & \frac{1}{\sqrt{\alpha_{t}}} x_{t}-\left(\frac{1}{\sqrt{\alpha_{t}}} \sqrt{1-\bar{\alpha}_{t}}-\frac{\left(1-\bar{\alpha}_{t-1}\right) \sqrt{\alpha_{t}}}{\sqrt{1-\bar{\alpha}_{t}}}\right) \epsilon_{\theta}\left(x_{t}\right) \\
+    = & \frac{1}{\sqrt{\alpha_{t}}} x_{t}-\left(\frac{\left(1-\bar{\alpha}_{t}\right)-\left(1-\bar{\alpha}_{t-1}\right) \alpha_{t}}{\sqrt{\alpha_{t}} \sqrt{1-\bar{\alpha}_{t}}}\right) \epsilon_{\theta}\left(x_{t}\right) \\
+    = & \frac{1}{\sqrt{\alpha_{t}}} x_{t}-\left(\frac{1-\bar{\alpha}_{t}-\alpha_{t}+\bar{\alpha}_{t}}{\sqrt{\alpha_{t}} \sqrt{1-\bar{\alpha}_{t}}}\right) \epsilon_{\theta}\left(x_{t}\right) \\
+    = & \frac{1}{\sqrt{\alpha_{t}}} x_{t}-\left(\frac{1-\alpha_{t}}{\sqrt{\alpha_{t}} \sqrt{1-\bar{\alpha}_{t}}}\right) \epsilon_{\theta}\left(x_{t}\right) \\
+    = & \frac{1}{\sqrt{\alpha_{t}}}\left(x_{t}-\frac{\beta_{t}}{\sqrt{1-\bar{\alpha}_{t}}}\right) \epsilon_{\theta}\left(x_{t}\right)
+  \end{aligned}
+  $$
+  
+  其中：
+  $$
+  \begin{aligned}
+    \sqrt{1-\bar{\alpha}_{t-1}-\sigma^{2}} & = \frac{\sqrt{1-\bar{\alpha}_{t}}}{\sqrt{1-\bar{\alpha}_{t}}} \sqrt{1-\bar{\alpha}_{t-1}-\frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_{t}}\left(1-\alpha_{t}\right)} \\
+    & = \frac{\sqrt{\left(1-\bar{\alpha}_{t-1}\right)\left(1-\frac{1}{1-\bar{\alpha}_{t}}\left(1-\alpha_{t}\right)\right)\left(1-\bar{\alpha}_{t}\right)}}{\sqrt{1-\bar{\alpha}_{t}}} \\
+    & = \frac{\sqrt{\left(1-\bar{\alpha}_{t-1}\right)\left(1-\bar{\alpha}_{t}-1+\alpha_{t}\right)}}{\sqrt{1-\bar{\alpha}_{t}}} \\
+    & = \frac{\sqrt{\left(1-\bar{\alpha}_{t-1}\right)\left(\alpha_{t}-\bar{\alpha}_{t}\right)}}{\sqrt{1-\bar{\alpha}_{t}}} \\
+    & = \frac{\sqrt{\left(1-\bar{\alpha}_{t-1}\right)\left(1-\bar{\alpha}_{t-1}\right) \alpha_{t}}}{\sqrt{1-\bar{\alpha}_{t}}} \\
+    & = \frac{\left(1-\bar{\alpha}_{t-1}\right) \sqrt{\alpha_{t}}}{\sqrt{1-\bar{\alpha}_{t}}} \\
+  \end{aligned}
+  $$
+  
+
+当$\eta = 0$时，这就是DDIM，因此DDIM其实并不是一个模型，只是一个特殊的采样方式。而当$\eta = 0$时，由于式$(9)$中唯一具有随机性的$\sigma\epsilon$此时亦为0，因此采样过程不再具有随机性，每个$\mathbf{x}_{T}$对应了确定的（deterministic）$\mathbf{x}_{0}$，这就有点类似GAN和VAE了。
+
+当步数$l$很小时，$\eta = 0$效果最好，并且当$\eta = 0$时，20步的生成结果与100步的生成结果一致性很强，这是显然的，因为此时模型变为了确定性模型（deterministic），但是这里面值得关注的是，由于当$\eta = 0$时，每个$\mathbf{x}_{T}$对应唯一的$\mathbf{x}_{0}$，就像我们上面说的，这有点类似GAN和VAE，那我们可以认为此时的$\mathbf{x}_{T}$就是一个high-level的图像编码向量，里面可能蕴涵了大量的信息特征，也许可以用于其他下游任务。最后，作者论述了当$\eta = 0$时，式$(9)$可以写成常微分方程的形式，因此可以理解为模型是在用欧拉法近似从$\mathbf{x}_{0}$到$\mathbf{x}_{T}$的编码函数。
+
+- **DDPM中如果在采样时令$\sigma = 0$，也就是也让它变成deterministic，为什么效果很差？**  
+  原因：在DDPM中，$q(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0})$的方差$\sigma$时我们通过式$(3)$贝叶斯公式计算出来的，并不是像DDIM一样假设来的，换句话说，DDIM的$\sigma$取何值也不影响边界分布$\mathbf{x}_{T} = \sqrt{\bar{\alpha}_{T}} + \sqrt{1-\bar{\alpha}_{T}}\epsilon$，但DDPM中是不可以改的，改了就不再遵循前向过程了，也就破坏了原本的分布。
+
+---
+### 总结
+
+由于DDPM是基于马尔可夫链建立起来的前向/逆向过程，因此不能“跳步”生成图像，且为了保证$\mathbf{x}_{T} \sim \mathcal{N}(0, \mathbf{I})$，$T$不能过小，因此自然会导致采样慢、出图效率低的缺点。而DDIM这篇文章介绍的方法，巧妙地通过自行设计优化目标$q(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0})$，将马尔可夫的限制取消，在不影响DDPM中的边界分布（i.e. 式$(2)$）的情况下大大缩短了采样步数。这样做的好处是，**训练好的DDPM可以直接拿来通过DDIM的采样方法进行采样，不需要再去训练一次。**
+
+---
 ## DDIM原理
+
+---
+### 概述
+用一段话大概描述DDIM做了件什么事情：
+
+DDPM中的推导路线：
+
+$$
+q(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}) \xrightarrow{\text{inference}} q(\mathbf{x}_{t} \mid \mathbf{x}_{0}) \xrightarrow{\text{inference}} q(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0}) \xrightarrow{\text{approximate}} p(\mathbf{x}_{t-1} \mid \mathbf{x}_{t})
+$$
+
+由DDPM的推导路线可知：
+1. 损失函数只依赖于边际分布$q(\mathbf{x}_{t} \mid \mathbf{x}_{0})$
+2. 采样过程只依赖于$p(\mathbf{x}_{t-1} \mid \mathbf{x}_{t})$
+
+因此虽然DDPM是从$q(\mathbf{x}_{t} \mid \mathbf{x}_{t-1})$为出发点一步步往前推的，但是最后的结果与它无关，所以可以把它从整个过程中忽略。
+
 在DDPM中，扩散过程（前向过程）定义为一个Markov Chain:
 
 $$ q\left(\mathbf{x}_{1: T} \mid \mathbf{x}_{0}\right)=\prod_{t=1}^{T} q\left(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}\right) \qquad q\left(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}\right)=\mathcal{N}\left(\mathbf{x}_{t} ; \sqrt{\frac{\alpha_{t}}{\alpha_{t-1}}} \mathbf{x}_{t-1},\left(1-\frac{\alpha_{t}}{\alpha_{t-1}}\right) \mathbf{I}\right) $$
 
-注意，在DDIM中，$\alpha_{t}$其实是DDPM中的$\bar{\alpha_{t}}=\prod_{i=1}^{T}\alpha_{i}$，其中$\alpha_{i}=1-\beta_{i}$，那么DDPM中的前向过程$\beta_{t}$就为:
+注意，在DDIM中，$\alpha_{t}$其实是DDPM中的$\bar{\alpha_{t}}=\prod_{i=1}^{t}\alpha_{i}=\prod_{i=1}^{t}(1-\beta_{t})$，那么DDPM中的前向过程$\beta_{t}$就为:
 
-$$ \beta{t}=(1-\frac{\alpha_{t}}{1-\alpha_{t-1}}) $$
+$$ \beta_{t}=(1-\frac{\alpha_{t}}{\alpha_{t-1}}) $$
 
 扩散过程的一个重要特征是可以直接用$\mathbf{x}_{0}$来对任意的$\mathbf{x}_{t}$进行采样：
 
-$$ q\left(\mathbf{x}_{t} \mid \mathbf{x}_{0}\right)=\mathcal{N}\left(\mathbf{x}_{t} ; \sqrt{\alpha_{t}\mathbf{x}_{0}}, \left(1-\alpha_{t}\right)\mathbf{I}\right) $$
+$$ q\left(\mathbf{x}_{t} \mid \mathbf{x}_{0}\right)=\mathcal{N}\left(\mathbf{x}_{t} ; \sqrt{\alpha_{t}}\mathbf{x}_{0}, \left(1-\alpha_{t}\right)\mathbf{I}\right) $$
 
 而DDPM的反向过程也定义为一个Markov Chain:
 
@@ -421,16 +614,16 @@ $$
 
  $$
 \begin{aligned}
-L_{\mathrm{VLB}} & =\mathbb{E}_{q\left(\mathbf{x}_{0 T T}\right)}\left[\log \frac{q\left(\mathbf{x}_{1: T} \mid \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_{0: T}\right)}\right] \\
-& =\mathbb{E}_q\left[\log \frac{\prod_{t=1}^T q\left(\mathbf{x}_t \mid \mathbf{x}_{t-1}\right)}{p_\theta\left(\mathbf{x}_T\right) \prod_{t=1}^T p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)}\right] \\
-& =\mathbb{E}_q\left[-\log p_\theta\left(\mathbf{x}_T\right)+\sum_{t=1}^T \log \frac{q\left(\mathbf{x}_t \mid \mathbf{x}_{t-1}\right)}{p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)}\right] \\
-& =\mathbb{E}_q\left[-\log p_\theta\left(\mathbf{x}_T\right)+\sum_{t=2}^T \log \frac{q\left(\mathbf{x}_t \mid \mathbf{x}_{t-1}\right)}{p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)}+\log \frac{q\left(\mathbf{x}_1 \mid \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)}\right] \\
-& =\mathbb{E}_q\left[-\log p_\theta\left(\mathbf{x}_T\right)+\sum_{t=2}^T \log \left(\frac{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)} \cdot \frac{q\left(\mathbf{x}_t \mid \mathbf{x}_0\right)}{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_0\right)}\right)+\log \frac{q\left(\mathbf{x}_1 \mid \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)}\right] \\
-& =\mathbb{E}_q\left[-\log p_\theta\left(\mathbf{x}_T\right)+\sum_{t=2}^T \log \frac{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)}+\sum_{t=2}^T \log \frac{q\left(\mathbf{x}_t \mid \mathbf{x}_0\right)}{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_0\right)}+\log \frac{q\left(\mathbf{x}_1 \mid \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)}\right] \\
-& =\mathbb{E}_q\left[-\log p_\theta\left(\mathbf{x}_T\right)+\sum_{t=2}^T \log \frac{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)}+\log \frac{q\left(\mathbf{x}_T \mid \mathbf{x}_0\right)}{q\left(\mathbf{x}_1 \mid \mathbf{x}_0\right)}+\log \frac{q\left(\mathbf{x}_1 \mid \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)}\right] \\
-& =\mathbb{E}_q\left[\log \frac{q\left(\mathbf{x}_T \mid \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_T\right)}+\sum_{t=2}^T \log \frac{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)}-\log p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)\right] \\
-& \cancel{=\mathbb{E}_q[\underbrace{D_{\mathrm{KL}}\left(q\left(\mathbf{x}_T \mid \mathbf{x}_0\right) \| p_\theta\left(\mathbf{x}_T\right)\right)}_{L_{T}} + \sum_{t=2}^T \underbrace{D_{\mathrm{KL}}\left(q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right) \| p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)\right)}_{L_{t-1}}  \underbrace{- \log p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)}_{L_0}]} \\
-& = \underbrace{D_{\mathrm{KL}}\left(q\left(\mathbf{x}_T \mid \mathbf{x}_0\right) \| p_\theta\left(\mathbf{x}_T\right)\right)}_{L_{T}} + \sum_{t=2}^T \underbrace{D_{\mathrm{KL}}\left(q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right) \| p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)\right)}_{L_{t-1}}  \underbrace{- \log p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)}_{L_0}
+    L_{\mathrm{VLB}} & =\mathbb{E}_{q\left(\mathbf{x}_{0 T T}\right)}\left[\log \frac{q\left(\mathbf{x}_{1: T} \mid \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_{0: T}\right)}\right] \\
+    & =\mathbb{E}_q\left[\log \frac{\prod_{t=1}^T q\left(\mathbf{x}_t \mid \mathbf{x}_{t-1}\right)}{p_\theta\left(\mathbf{x}_T\right) \prod_{t=1}^T p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)}\right] \\
+    & =\mathbb{E}_q\left[-\log p_\theta\left(\mathbf{x}_T\right)+\sum_{t=1}^T \log \frac{q\left(\mathbf{x}_t \mid \mathbf{x}_{t-1}\right)}{p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)}\right] \\
+    & =\mathbb{E}_q\left[-\log p_\theta\left(\mathbf{x}_T\right)+\sum_{t=2}^T \log \frac{q\left(\mathbf{x}_t \mid \mathbf{x}_{t-1}\right)}{p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)}+\log \frac{q\left(\mathbf{x}_1 \mid \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)}\right] \\
+    & =\mathbb{E}_q\left[-\log p_\theta\left(\mathbf{x}_T\right)+\sum_{t=2}^T \log \left(\frac{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)} \cdot \frac{q\left(\mathbf{x}_t \mid \mathbf{x}_0\right)}{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_0\right)}\right)+\log \frac{q\left(\mathbf{x}_1 \mid \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)}\right] \\
+    & =\mathbb{E}_q\left[-\log p_\theta\left(\mathbf{x}_T\right)+\sum_{t=2}^T \log \frac{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)}+\sum_{t=2}^T \log \frac{q\left(\mathbf{x}_t \mid \mathbf{x}_0\right)}{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_0\right)}+\log \frac{q\left(\mathbf{x}_1 \mid \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)}\right] \\
+    & =\mathbb{E}_q\left[-\log p_\theta\left(\mathbf{x}_T\right)+\sum_{t=2}^T \log \frac{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)}+\log \frac{q\left(\mathbf{x}_T \mid \mathbf{x}_0\right)}{q\left(\mathbf{x}_1 \mid \mathbf{x}_0\right)}+\log \frac{q\left(\mathbf{x}_1 \mid \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)}\right] \\
+    & =\mathbb{E}_q\left[\log \frac{q\left(\mathbf{x}_T \mid \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_T\right)}+\sum_{t=2}^T \log \frac{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right)}{p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)}-\log p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)\right] \\
+    & =\mathbb{E}_q[\underbrace{D_{\mathrm{KL}}\left(q\left(\mathbf{x}_T \mid \mathbf{x}_0\right) \| p_\theta\left(\mathbf{x}_T\right)\right)}_{L_{T}} + \sum_{t=2}^T \underbrace{D_{\mathrm{KL}}\left(q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right) \| p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)\right)}_{L_{t-1}}  \underbrace{- \log p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)}_{L_0}] \\
+    & = \cancel{\underbrace{D_{\mathrm{KL}}\left(q\left(\mathbf{x}_T \mid \mathbf{x}_0\right) \| p_\theta\left(\mathbf{x}_T\right)\right)}_{L_{T}} + \sum_{t=2}^T \underbrace{D_{\mathrm{KL}}\left(q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right) \| p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right)\right)}_{L_{t-1}}  \underbrace{- \log p_\theta\left(\mathbf{x}_0 \mid \mathbf{x}_1\right)}_{L_0}}
 \end{aligned}
 $$
  
@@ -521,9 +714,9 @@ $$
 这里$c$是一个定值，它的设定使得$\tau_{-1}$最接近$\mathit{T}$。论文中只对CIFAR10数据集采用**Quadratic**序列，其它数据集均采用**Linear**序列。
 
 
+
 ## References
 [1]: Feller, William. "On the theory of stochastic processes, with particular reference to applications." Selected Papers I. Springer, Cham, 2015. 769-798.  
-[2]: Song, Jiaming, Chenlin Meng, and Stefano Ermon. "Denoising diffusion implicit models." arXiv preprint arXiv:2010.02502 (2020)
-
-
-
+[2]: Song, Jiaming, Chenlin Meng, and Stefano Ermon. "Denoising diffusion implicit models." arXiv preprint arXiv:2010.02502 (2020)  
+[3]: Ho, Jonathan, Ajay Jain, and Pieter Abbeel. "Denoising diffusion probabilistic models." Advances in neural information processing systems 33 (2020): 6840-6851.  
+[4]: Weng, Lilian. (Jul 2021). What are diffusion models? Lil’Log. https://lilianweng.github.io/posts/2021-07-11-diffusion-models/.
