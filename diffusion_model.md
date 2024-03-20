@@ -1,4 +1,25 @@
 # Diffusion Model
+- [Diffusion Model](#diffusion-model)
+  - [DDPM原理](#ddpm原理)
+    - [问题概述](#问题概述)
+    - [Diffusion前向过程](#diffusion前向过程)
+      - [特性1：重参数(reparameterization trick)](#特性1重参数reparameterization-trick)
+      - [特性2：任意时刻的$\\mathbf{x}_{t}$可以由$\\mathbf{x}_{0}$和$\\beta$表示](#特性2任意时刻的mathbfxt可以由mathbfx0和beta表示)
+    - [Diffusion逆向(推断)过程](#diffusion逆向推断过程)
+    - [Diffusion训练](#diffusion训练)
+      - [Fubini定理](#fubini定理)
+      - [Jensen不等式](#jensen不等式)
+      - [一元连续高斯分布的KL散度](#一元连续高斯分布的kl散度)
+      - [多元连续高斯分布的KL散度](#多元连续高斯分布的kl散度)
+    - [为什么DDPM一定要这么多次采样？](#为什么ddpm一定要这么多次采样)
+    - [DDIM是如何去马尔科夫化的？](#ddim是如何去马尔科夫化的)
+    - [DDIM的采样过程](#ddim的采样过程)
+    - [总结](#总结)
+  - [DDIM原理](#ddim原理)
+    - [概述](#概述)
+  - [References](#references)
+
+---
 Diffusion Model和其他生成模型最大的区别是它的latent code(z)和原图是同尺寸大小的，当然最近也有基于压缩的latent diffusion model。一句话概括diffusion model，即存在一系列高斯噪声($\mathbin{T}$轮)，将输入图片$\mathcal{x}_{0}$变为纯高斯噪声$\mathcal{x}_{T}$。而我们的模型则负责将$\mathcal{x}_{T}$复原回图片$\mathcal{x}_{0}$。这样一来其实diffusion model和GAN很像，都是给定噪声$\mathcal{x}_{T}$生成图片$\mathcal{x}_{0}$，但是要强调的是，这里的$\mathcal{x}_{T}$与图片$\mathcal{x}_{0}$是**同维度**的。
 
 <div style="text-align:center">
@@ -39,7 +60,7 @@ $$
 重参数技巧在很多工作(Gumbel Softmax, VAE)中有所引用。如果我们要从某个分布中随机采样(高斯分布)一个样本，这个过程是无法反传梯度的。而这个通过高斯噪声采样得到的$\mathbf{x}_{t}$的过程在diffusion中到处都是，因此我们需要通过重参数技巧来使得它可微。最通常的做法是把随机性通过一个独立的随机变量($\epsilon$)引导过去。举个例子，如果要从高斯分布$z \sim \mathcal{N}\left(z; \mu_{\theta}, \sigma_{\theta}^{2}\mathbf{I}\right)$采样一个$z$，我们可以写成：
 
 $$
-z = \mu_{\theta} + \sigma_{\theta} \odot \epsilon, \quad \epsilon \sim \mathcal{N}\left(0, \mathbf{I}\right)
+z = \mu_{\theta} + \sigma_{\theta} \odot \epsilon, \quad \epsilon \sim \mathcal{N}\left(0, \mathbf{I}\right) \tag{1}
 $$
 
 上式的$z$依旧是有随机性的，且满足均值为$\mu_{\theta}$方差为$\sigma_{\theta}^{2}$的高斯分布。这里的$\mu_{\theta}$，$\sigma_{\theta}^{2}$可以是由参数$\theta$的神经网络推断得到的。整个“采样”过程依旧梯度可导，随机性被转嫁到了$\epsilon$上。
@@ -107,7 +128,7 @@ $$
     & = q\left(\mathbf{x}_{t} \mid \mathbf{x}_{t-1}\right)\frac{q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_{0} \right)}{q\left(\mathbf{x}_{t} \mid \mathbf{x}_{0}\right)} \\
     & \propto \exp \left(-\frac{1}{2}\left(\frac{\left(\mathbf{x}_{t}-\sqrt{\alpha_{t}} \mathbf{x}_{t-1}\right)^{2}}{\beta_{t}} + \frac{\left(\mathbf{x}_{t-1}-\sqrt{\bar{\alpha}_{t-1}} \mathbf{x}_{0}\right)^{2}}{1-\bar{\alpha}_{t-1}} - \frac{\left(\mathbf{x}_{t}-\sqrt{\bar{\alpha}_{t}} \mathbf{x}_{0}\right)^{2}}{1-\bar{\alpha}_{t}}\right)\right) \\
     & =\exp \left(-\frac{1}{2}\left(\frac{\mathbf{x}_{t}^{2}-2 \sqrt{\alpha_{t}} \mathbf{x}_{t} \mathbf{x}_{t-1}+\alpha_{t} \mathbf{x}_{t-1}^{2}}{\beta_{t}}+\frac{\mathbf{x}_{t-1}^{2}-2 \sqrt{\bar{\alpha}_{t-1}} \mathbf{x}_{0} \mathbf{x}_{t-1}+\bar{\alpha}_{t-1} \mathbf{x}_{0}^{2}}{1-\bar{\alpha}_{t-1}}-\frac{\left(\mathbf{x}_{t}-\sqrt{\bar{\alpha}_{t}} \mathbf{x}_{0}\right)^{2}}{1-\bar{\alpha}_{t}}\right)\right) \\
-    & = \exp \left(-\frac{1}{2}\left(\underbrace{\left(\frac{\alpha_{t}}{\beta_{t}}+\frac{1}{1-\bar{\alpha}_{t-1}}\right) \mathbf{x}_{t-1}^{2}}_{\mathbf{x}_{t-1} \text { 方差 }}-\underbrace{\left(\frac{2 \sqrt{\alpha_{t}}}{\beta_{t}} \mathbf{x}_{t}+\frac{2 \sqrt{\bar{\alpha}_{t-1}}}{1-\bar{\alpha}_{t-1}} \mathbf{x}_{0}\right) \mathbf{x}_{t-1}}_{x_{t-1} \text { 均值 }}+\underbrace{C\left(\mathbf{x}_{t}, \mathbf{x}_{0}\right)}_{\text {与 } x_{t-1} \text { 方关 }}\right)\right) .
+    & = \exp \left(-\frac{1}{2}\left(\underbrace{\left(\frac{\alpha_{t}}{\beta_{t}}+\frac{1}{1-\bar{\alpha}_{t-1}}\right) \mathbf{x}_{t-1}^{2}}_{\mathbf{x}_{t-1} \text { 方差 }}-\underbrace{\left(\frac{2 \sqrt{\alpha_{t}}}{\beta_{t}} \mathbf{x}_{t}+\frac{2 \sqrt{\bar{\alpha}_{t-1}}}{1-\bar{\alpha}_{t-1}} \mathbf{x}_{0}\right) \mathbf{x}_{t-1}}_{x_{t-1} \text { 均值 }}+\underbrace{C\left(\mathbf{x}_{t}, \mathbf{x}_{0}\right)}_{\text {与 } x_{t-1} \text { 无关 }}\right)\right) .
 \end{aligned}
 $$
 
@@ -271,7 +292,7 @@ $$
 \end{aligned}
 $$
 
-由于前向$q$没有科学系参数，而$\mathbf{x}_{T}$则是纯高斯噪声，$L_{T}$可以当做常量忽略。而$L_{t}$则可以看做拉进两个高斯分布$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right) = \mathcal{N}(\mathbf{x}_{t-1}; \tilde{\mu}(\mathbf{x}_{t}, \mathbf{x}_{0}), \tilde{\beta}_{t}\mathbf{I})$和$p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right) = \mathcal{N}(\mathbf{x}_{t-1}; \boldsymbol{\mu}_{\theta}(\mathbf{x}_{t}, t), \boldsymbol{\Sigma}_{\theta})$，根据高斯分布的KL散度公式求解下式：
+由于前向$q$没有可学习参数，而$\mathbf{x}_{T}$则是纯高斯噪声，$L_{T}$可以当做常量忽略。而$L_{t}$则可以看做拉进两个高斯分布$q\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t, \mathbf{x}_0\right) = \mathcal{N}(\mathbf{x}_{t-1}; \tilde{\mu}(\mathbf{x}_{t}, \mathbf{x}_{0}), \tilde{\beta}_{t}\mathbf{I})$和$p_\theta\left(\mathbf{x}_{t-1} \mid \mathbf{x}_t\right) = \mathcal{N}(\mathbf{x}_{t-1}; \boldsymbol{\mu}_{\theta}(\mathbf{x}_{t}, t), \boldsymbol{\Sigma}_{\theta})$，根据高斯分布的KL散度公式求解下式：
 
 $$
 L_{t}=\mathbb{E}_{q}\left[\frac{1}{2\left\|\Sigma_{\theta}\left(\mathbf{x}_{t}, t\right)\right\|_{2}^{2}}\left\|\tilde{\mu}_{t}\left(\mathbf{x}_{t}, \mathbf{x}_{0}\right)-\mu_{\theta}\left(\mathbf{x}_{t}, t\right)\right\|^{2}\right]+C,
@@ -303,7 +324,7 @@ $$
 
 因此，训练过程可以看做:  
 (1) **获取输入$\mathbf{x}_{0}$，从$1, \ldots, T$随机采样一个$t$.**  
-(2) **从标准高斯分布采样一个噪声$\epsilon \sim \mathcal{N}(0, \mathbf{I})$.**  
+(2) **从标准高斯分布采样一个噪声$\epsilon_{t} \sim \mathcal{N}(0, \mathbf{I})$.**  
 (3) **最小化$\left\|\epsilon_{t}-\epsilon_{\theta}\left(\sqrt{\bar{\alpha}_{t}} \mathbf{x}_{0}+\sqrt{1-\bar{\alpha}_{t}} \epsilon_{t}, t\right)\right\|$.**
 
 算法流程图如下：
@@ -504,7 +525,7 @@ $$
 \mathbf{x}_{s} = \sqrt{\bar{\alpha}_{s}}\left(\frac{\mathbf{x}_{k} - \sqrt{1-\bar{\alpha}_{k}}\epsilon_{\theta}(\mathbf{x}_{k})}{\sqrt{\bar{\alpha}_{k}}}\right) + \sqrt{1-\bar{\alpha}_{s}-\sigma^{2}}\epsilon_{\theta}(\mathbf{x}_{k}) + \sigma\epsilon \tag{9}
 $$
 
-其中严格满足$s < k$。于是，我们就可以从时间序列$\{1, \ldots, T\}$中随机去一个长度为$l$的升序子序列，通过式$(9)$迭代采样$l$次最终得到我们想要的$\mathbf{x}_{0}$。
+其中严格满足$s < k$。于是，我们就可以从时间序列$\{1, \ldots, T\}$中随机取一个长度为$l$的升序子序列，通过式$(9)$迭代采样$l$次最终得到我们想要的$\mathbf{x}_{0}$。
 
 到目前为止，我们基本完成了DDIM原理的推导，目前还有一个问题没解决，那就是$\sigma$的取值问题。原文的appendixB证明了无论$\sigma$取值为何，都不影响式（2）的成立。因此我们可以较为随意的取值。我们第一时间想到的就是令$\sigma^2=\frac{1-\bar{\alpha}_{t-1}}{1-\bar{\alpha}_{t}}\beta_{t}$，即DDPM中$q(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0})$的方差。
 
@@ -550,7 +571,7 @@ $$
 当步数$l$很小时，$\eta = 0$效果最好，并且当$\eta = 0$时，20步的生成结果与100步的生成结果一致性很强，这是显然的，因为此时模型变为了确定性模型（deterministic），但是这里面值得关注的是，由于当$\eta = 0$时，每个$\mathbf{x}_{T}$对应唯一的$\mathbf{x}_{0}$，就像我们上面说的，这有点类似GAN和VAE，那我们可以认为此时的$\mathbf{x}_{T}$就是一个high-level的图像编码向量，里面可能蕴涵了大量的信息特征，也许可以用于其他下游任务。最后，作者论述了当$\eta = 0$时，式$(9)$可以写成常微分方程的形式，因此可以理解为模型是在用欧拉法近似从$\mathbf{x}_{0}$到$\mathbf{x}_{T}$的编码函数。
 
 - **DDPM中如果在采样时令$\sigma = 0$，也就是也让它变成deterministic，为什么效果很差？**  
-  原因：在DDPM中，$q(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0})$的方差$\sigma$时我们通过式$(3)$贝叶斯公式计算出来的，并不是像DDIM一样假设来的，换句话说，DDIM的$\sigma$取何值也不影响边界分布$\mathbf{x}_{T} = \sqrt{\bar{\alpha}_{T}} + \sqrt{1-\bar{\alpha}_{T}}\epsilon$，但DDPM中是不可以改的，改了就不再遵循前向过程了，也就破坏了原本的分布。
+  原因：在DDPM中，$q(\mathbf{x}_{t-1} \mid \mathbf{x}_{t}, \mathbf{x}_{0})$的方差$\sigma$是我们通过式$(3)$贝叶斯公式计算出来的，并不是像DDIM一样假设来的，换句话说，DDIM的$\sigma$取何值也不影响边界分布$\mathbf{x}_{T} = \sqrt{\bar{\alpha}_{T}} + \sqrt{1-\bar{\alpha}_{T}}\epsilon$，但DDPM中是不可以改的，改了就不再遵循前向过程了，也就破坏了原本的分布。
 
 ---
 ### 总结
@@ -627,7 +648,7 @@ $$
 \end{aligned}
 $$
  
-根据两个高斯公式的KL公式，我们进一步得到：
+根据两个高斯分布的KL散度公式，我们进一步得到：
 
 $$
 L_{t-1} = \mathbb{E}_{q\left(\mathbf{x}_{t} \mid \mathbf{x}_{0}\right)} \left[\frac{1}{2\sigma_{t}^{2}} \left\| \tilde{\mu_{t}}\left(\mathbf{x}_{t}, \mathbf{x}_{0}\right) - \mu_{\theta}\left(\mathbf{x}_{t}, t\right) \right\|^{2}\right]
